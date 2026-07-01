@@ -20,8 +20,9 @@ async def main():
         await init_db()
         
         # 2. Подключение роутеров
-        dp.include_router(router)
         dp.include_router(admin_router)
+
+        dp.include_router(router)
         
         # 3. Проверка и уведомление
         me = await bot.get_me()
