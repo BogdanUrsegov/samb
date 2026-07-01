@@ -366,6 +366,13 @@ async def handle_cancel_payment(query: CallbackQuery):
     )
     await query.answer("Отменено")
 
+@router.message(Command("policy"))
+async def handle_policy_command(message: Message, bot: Bot):
+    await message.answer(
+        '<a href="https://telegra.ph/POLITIKA-KONFIDENCIALNOSTI-09-30-71">политика конфиденциальности</a>, <a href="https://telegra.ph/PUBLICHNAYA-OFERTA-09-30-5">публичная оферта</a>, <a href="https://telegra.ph/POLITIKA-VOZVRATOV-09-30">политика возвратов</a>',
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
 
 # ==========================================
 # FALLBACK ОБРАБОТЧИК
