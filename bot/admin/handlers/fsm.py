@@ -2,7 +2,6 @@ import logging
 from aiogram import Router, F, Bot
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from bot.admin.filters import IsAdmin
 from bot.admin.keyboards import admin_back_keyboard, user_actions_keyboard, vip_plans_keyboard
 from bot.admin.states import AdminStates
 from bot.database.utils import (
@@ -14,7 +13,6 @@ from bot.database.utils import (
 
 logger = logging.getLogger(__name__)
 router = Router()
-router.message.filter(IsAdmin())
 
 
 @router.message(AdminStates.waiting_for_user_id)

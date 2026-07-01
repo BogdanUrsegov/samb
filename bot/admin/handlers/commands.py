@@ -1,12 +1,10 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
-from bot.admin.filters import IsAdmin
 from bot.create_bot import ADMIN_ID
 from bot.admin.keyboards import admin_menu_keyboard
 
 router = Router()
-router.message.filter(Command("admin_menu"), IsAdmin())
 
 @router.message(Command("admin_menu"))
 async def admin_menu(message: Message):

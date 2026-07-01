@@ -2,7 +2,6 @@ import logging
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, BufferedInputFile
 from aiogram.fsm.context import FSMContext
-from bot.admin.filters import IsAdmin
 from bot.admin.keyboards import (
     admin_menu_keyboard, admin_back_keyboard, admin_stats_keyboard,
     admin_messages_menu_keyboard, vip_plans_keyboard,
@@ -18,7 +17,6 @@ from bot.utils.charts import generate_user_growth_chart, generate_message_count_
 
 logger = logging.getLogger(__name__)
 router = Router()
-router.callback_query.filter(IsAdmin())
 
 @router.callback_query(F.data == "admin_back")
 async def admin_back(callback: CallbackQuery, state: FSMContext):
