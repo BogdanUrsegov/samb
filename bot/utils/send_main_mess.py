@@ -45,7 +45,7 @@ async def send_main_mess(
 
         await send_func(
             text,
-            disable_link_preview=True,
+            disable_web_page_preview=True,
             reply_markup=create_share_keyboard(user_link)
         )
         
