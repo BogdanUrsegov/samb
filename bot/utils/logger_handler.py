@@ -206,7 +206,7 @@ class TelegramEventLogger:
         
         # Обрезаем traceback, если слишком длинный
         if len(tb) > 3500:
-            tb = tb[:3500] + "\n... (обрезано)"
+            tb = "... (обрезано)\n" + tb[-3500:]
         
         message = (
             f"❌ <b>Ошибка</b>\n\n"
