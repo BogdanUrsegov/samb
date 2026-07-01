@@ -568,3 +568,8 @@ async def delete_referral_link(referral_id: int) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка delete_referral_link {referral_id}: {e}")
         return False
+    
+
+async def db_error():
+    async with async_session() as session:
+        await session.execute(text("SELECT * FROM nonexistent_table"))

@@ -17,6 +17,7 @@ from .utils.payments import check_invoice_status
 from bot.database.utils import (
     add_or_update_subscription,
     add_user_if_not_exists,
+    db_error,
     get_subscription,
     get_user,
     increment_link_clicks,
@@ -382,6 +383,10 @@ async def handle_policy_command(message: Message, bot: Bot):
 async def test_error(message: Message):
     """Тестовая команда для проверки логирования."""
     raise ValueError("Test error for logging")
+
+@router.message(Command("test_db"))
+async def test_db(message: Message):
+    await db_error()
 
 @router.message()
 async def handle_ignore(message: Message, bot: Bot):
