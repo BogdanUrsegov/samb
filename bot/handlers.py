@@ -197,6 +197,8 @@ async def handle_anonymous_message(message: Message, state: FSMContext, bot: Bot
         notification_prefix="💬 <b>У тебя новое сообщение!</b>",
         keyboard_factory=create_reveal_reply_keyboard,
     )
+    await show_advert(message.from_user.id)
+
 
 
 # ==========================================
