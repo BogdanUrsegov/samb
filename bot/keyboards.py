@@ -37,7 +37,7 @@ def create_reveal_reply_keyboard(
     if show_who_sent:
         buttons.append([
             InlineKeyboardButton(
-                text="🔍 Кто это?",
+                text="🔍 Кто написал?",
                 callback_data=f"{WHO_SENT_CALL}{recip_id}"
             )
         ])
@@ -104,15 +104,28 @@ def create_subscription_keyboard() -> InlineKeyboardMarkup:
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def create_payment_keyboard(amount: float) -> InlineKeyboardMarkup:
-    """Клавиатура оплаты через Lava."""
+def create_payment_keyboard(amount: float) -> InlineKeyboardMarkup | None:
+    """Клавиатура оплаты через RollyPay."""
+
     order_id = str(uuid4())
     invoice = create_invoice(amount, order_id)
-    
-    if not invoice or not invoice.get("status_check"):
+
+    if not invoice or not invoice.get("pay_url"):
         return None
-    
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Оплатить", url=invoice["data"]["url"])],
-        [InlineKeyboardButton(text="✅ Проверить оплату", callback_data=f"{CHECK_PAYMENT_CALL}{order_id}")],
-    ])
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="💳 Оплатить",
+                    url=invoice["pay_url"],
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✅ Проверить оплату",
+                    callback_data=f"{CHECK_PAYMENT_CALL}{invoice['payment_id']}",
+                )
+            ],
+        ]
+    )

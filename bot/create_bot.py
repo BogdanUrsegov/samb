@@ -12,8 +12,8 @@ ADMIN_ID = os.getenv("ADMIN_ID")
 LOGS_CHANNEL_ID = os.getenv("LOGS_CHANNEL_ID")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-if not all([BOT_TOKEN, ADMIN_ID, LOGS_CHANNEL_ID]):
-    raise ValueError("Missing required env vars: BOT_TOKEN, ADMIN_ID, LOGS_CHANNEL_ID")
+if not all([BOT_TOKEN, ADMIN_ID]):
+    raise ValueError("Missing required env vars: BOT_TOKEN, ADMIN_ID")
 
 # 2. Базовое логирование (применяем LOG_LEVEL)
 logging.basicConfig(

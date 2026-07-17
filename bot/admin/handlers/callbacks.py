@@ -114,7 +114,7 @@ async def admin_delete_user(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.callback_query(F.data.startswith("admin_vip_"))
-async def admin_set_vip(callback: CallbackQuery):
+async def admin_set_vip(callback: CallbackQuery, bot: Bot):
     try:
         parts = callback.data.split("_")
         plan = parts[2]
@@ -128,6 +128,11 @@ async def admin_set_vip(callback: CallbackQuery):
             f"План: <b>{plan}</b>",
             reply_markup=admin_back_keyboard()
         )
+
+        await bot.send_message(user_id, 
+                               f"✅ <b>Вам выдали VIP подписку</b>\n\n"
+                               "<i>Теперь вы можете посмотреть кто вам написал!</i>"
+                               )
         await callback.answer("✅ Готово!")
     except Exception as e:
         logger.exception(f"Error in admin_set_vip: {e}")

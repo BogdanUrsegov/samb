@@ -1,46 +1,75 @@
 """
-Платежи через Lava.ru API.
+Платежи через RollyPay API.
 """
 
 import os
+import uuid
 import requests
-import json
-import hmac
-import hashlib
 
-SHOP_ID = os.getenv("lava_shop_id")
-SECRET_KEY = os.getenv("SECRET_KEY")
-API_BASE_URL = "https://api.lava.ru/business"
+API_KEY = os.getenv("ROLLYPAY_API_KEY")
+API_BASE_URL = "https://rollypay.io/api/v1"
 
 
-def _send_request(endpoint: str, payload: dict) -> dict | None:
-    """Отправляет подписанный запрос к Lava API."""
+def _send_request(
+    method: str,
+    endpoint: str,
+    payload: dict | None = None,
+) -> dict | None:
+    """Отправляет запрос к RollyPay API."""
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": API_KEY,
+        "X-Nonce": str(uuid.uuid4()),
+    }
+
     url = f"{API_BASE_URL}/{endpoint}"
-    sorted_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    signature = hmac.new(
-        SECRET_KEY.encode(), sorted_payload.encode(), hashlib.sha256
-    ).hexdigest()
-    
-    payload["signature"] = signature
-    headers = {"Accept": "application/json", "Content-Type": "application/json"}
-    
+
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response = requests.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+
         response.raise_for_status()
         return response.json()
+
     except Exception as e:
-        print(f"Lava API error: {e}")
+        print(f"RollyPay API error: {e}")
         return None
 
 
-def create_invoice(amount: float, order_id: str, comment: str = None) -> dict | None:
+def create_invoice(
+    amount: float,
+    order_id: str,
+    comment: str = None,
+) -> dict | None:
     """Создаёт счёт на оплату."""
-    payload = {"shopId": SHOP_ID, "sum": amount, "orderId": order_id}
+
+    payload = {
+        "amount": f"{amount:.2f}",
+        "payment_currency": "RUB",
+        "order_id": order_id,
+        "payment_method": "sbp",
+    }
+
     if comment:
-        payload["comment"] = comment
-    return _send_request("invoice/create", payload)
+        payload["description"] = comment
+
+    return _send_request(
+        "POST",
+        "payments",
+        payload,
+    )
 
 
-def check_invoice_status(order_id: str) -> dict | None:
+def check_invoice_status(payment_id: str) -> dict | None:
     """Проверяет статус счёта."""
-    return _send_request("invoice/status", {"shopId": SHOP_ID, "orderId": order_id})
+
+    return _send_request(
+        "GET",
+        f"payments/{payment_id}",
+    )

@@ -1,5 +1,5 @@
-import logging
 import os
+import logging
 from aiogram.types import ErrorEvent
 from aiogram.exceptions import TelegramBadRequest
 from aiogram import Bot, F, Router
@@ -317,46 +317,63 @@ async def handle_subscription_choice(query: CallbackQuery):
 @router.callback_query(F.data.startswith(CHECK_PAYMENT_CALL))
 async def handle_payment_check(query: CallbackQuery):
     """Обработчик проверки оплаты."""
-    order_id = query.data.split(":", 1)[1]
+
+    payment_id = query.data.split(":", 1)[1]
+    logger.info(f"payment_id = {payment_id}")
     user = query.from_user
-    
+
     try:
-        status_data = check_invoice_status(order_id)
-        if not status_data or not status_data.get("status_check"):
-            return await query.answer("❌ Ошибка проверки", show_alert=True)
-        
-        status = status_data["data"]["status"]
-        if status != "success":
-            return await query.answer("⏳ Платёж не найден, попробуйте позже", show_alert=True)
-        
-        # Определяем план по сумме
-        amount = status_data["data"]["amount"]
-        plan = next((k for k, v in PLAN_PRICES.items() if v == amount), None)
-        
-        if not plan:
-            return await query.answer("❌ Неизвестная сумма", show_alert=True)
-            
+        payment = check_invoice_status(payment_id)
+
+        if payment is None:
+            return await query.answer(
+                "❌ Ошибка проверки",
+                show_alert=True,
+            )
+
+        if payment.get("status") != "paid":
+            return await query.answer(
+                "⏳ Платёж ещё не оплачен",
+                show_alert=True,
+            )
+
+        amount = float(payment["amount"])
+
+        plan = next(
+            (k for k, v in PLAN_PRICES.items() if v == amount),
+            None,
+        )
+
+        if plan is None:
+            return await query.answer(
+                "❌ Неизвестная сумма",
+                show_alert=True,
+            )
+
         await add_or_update_subscription(user.id, plan)
-        
+
         await query.message.edit_text(
             f"✅ <b>Оплата подтверждена!</b>\n\n"
-            f"🎉 <b>VIP активен на {PLAN_PERIODS_GEN[plan]}!</b>",
+            f"🎉 <b>VIP активен на {PLAN_PERIODS_GEN[plan]}!</b>\n\n"
+            "<i>Теперь вы можете узнать кто вам написал, нажав <b>Кто это?</b></i>",
             reply_markup=None,
         )
+
         await query.answer("✅ Оплачено!")
+
         await event_logger.log_subscription_purchase(
             user_id=user.id,
             username=user.username,
             first_name=user.full_name,
             plan=PLAN_PERIODS_GEN[plan],
-            amount=amount
+            amount=amount,
         )
 
-        
     except Exception as e:
         logger.exception(f"Payment check error: {e}")
-        await query.answer("⚙️ Ошибка проверки", show_alert=True)
-
+        await query.answer(
+            "⚙️ Ошибка проверки"
+        )
 
 @router.callback_query(F.data == "cancel_payment")
 async def handle_cancel_payment(query: CallbackQuery):
