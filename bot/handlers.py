@@ -12,6 +12,7 @@ from aiogram.utils.formatting import html_decoration
 from bot.create_bot import event_logger
 from bot.utils.create_link import create_link
 from bot.utils.resolve_user_id import resolve_user_id
+from bot.utils.show_advert import show_advert
 
 from .utils.payments import check_invoice_status
 from bot.database.utils import (
@@ -186,6 +187,7 @@ async def handle_responding_message(message: Message, state: FSMContext, bot: Bo
         notification_prefix="💬 <b>Ответ на ваше сообщение:</b>",
         keyboard_factory=create_send_another_keyboard,
     )
+    await show_advert(message.from_user.id)
 
 
 @router.message(StateFilter(AnonymousMessaging.waiting_for_message))
