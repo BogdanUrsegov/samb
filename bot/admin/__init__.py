@@ -1,5 +1,5 @@
 from aiogram import Router
-from bot.admin.handlers import callbacks, commands, fsm
+from bot.admin.handlers import callbacks, commands, fsm, referrals
 
 # Создаем главный роутер админки
 admin_router = Router()
@@ -8,3 +8,4 @@ admin_router = Router()
 admin_router.include_router(callbacks.router)
 admin_router.include_router(commands.router)
 admin_router.include_router(fsm.router)
+admin_router.include_router(referrals.router)
