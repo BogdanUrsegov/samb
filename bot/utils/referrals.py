@@ -3,7 +3,7 @@
 import re
 
 REFERRAL_PREFIX = "ref_"
-_REFERRAL_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{1,60}$")
+_REFERRAL_CODE_RE = re.compile(r"^[A-Za-z0-9_]{1,60}$")
 
 
 def normalize_referral_code(value: str) -> str | None:
