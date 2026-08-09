@@ -5,6 +5,7 @@ import re
 from decimal import Decimal, InvalidOperation
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -44,11 +45,15 @@ async def _render_admin_referral(callback: CallbackQuery, bot: Bot, referral_id:
 
     bot_username = (await bot.me()).username
     link = f"https://t.me/{bot_username}?start={referral_payload(stats['code'])}"
-    await callback.message.edit_text(
-        format_referral_stats(stats, link),
-        reply_markup=referral_stats_keyboard(referral_id, admin=True),
-        disable_web_page_preview=True,
-    )
+    try:
+        await callback.message.edit_text(
+            format_referral_stats(stats, link),
+            reply_markup=referral_stats_keyboard(referral_id, admin=True),
+            disable_web_page_preview=True,
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
     return True
 
 
@@ -76,7 +81,7 @@ async def process_referral_name(message: Message, state: FSMContext):
     await state.update_data(referral_name=name)
     await state.set_state(AdminStates.waiting_for_referral_code)
     await message.answer(
-        "Введите код ссылки (латиница, цифры, `_` или `-`, до 60 символов).\n"
+        "Введите код ссылки (только латинские буквы, цифры и `_`, до 60 символов).\n"
         "Например: <code>summer_2026</code>",
         reply_markup=admin_back_keyboard(),
     )
@@ -88,7 +93,7 @@ async def process_referral_code(message: Message, state: FSMContext):
         return
     code = normalize_referral_code(message.text or "")
     if not code:
-        await message.reply("❌ Некорректный код. Используйте латиницу, цифры, `_` и `-`.")
+        await message.reply("❌ Некорректный код. Разрешены только латинские буквы, цифры и `_`.")
         return
     if await get_referral_by_code(code):
         await message.reply("❌ Такой активный реферальный код уже существует.")
@@ -193,4 +198,4 @@ async def admin_referral_refresh(callback: CallbackQuery, bot: Bot):
         return
     referral_id = int(callback.data.rsplit("_", 1)[1])
     if await _render_admin_referral(callback, bot, referral_id):
-        await callback.answer("🔄 Статистика обновлена")
+        await callback.answer("🔄 Статистика обновлена или уже актуальна")
