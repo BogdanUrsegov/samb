@@ -24,8 +24,15 @@ class ReferralHelpersTest(unittest.TestCase):
     def test_invalid_codes_are_rejected(self):
         self.assertIsNone(normalize_referral_code(""))
         self.assertIsNone(normalize_referral_code("bad code"))
+        self.assertIsNone(normalize_referral_code("bad-code"))
         self.assertIsNone(normalize_referral_code("русский"))
         self.assertIsNone(normalize_referral_code("a" * 61))
+
+    def test_only_letters_digits_and_underscore_are_allowed(self):
+        self.assertEqual(normalize_referral_code("abc_123XYZ"), "abc_123XYZ")
+        self.assertIsNone(normalize_referral_code("abc-123"))
+        self.assertIsNone(normalize_referral_code("abc.123"))
+        self.assertIsNone(normalize_referral_code("abc/123"))
 
 
 if __name__ == "__main__":
