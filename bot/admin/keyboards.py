@@ -19,7 +19,7 @@ def admin_back_keyboard() -> InlineKeyboardMarkup:
 def admin_stats_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 График роста", callback_data="admin_growth_chart")],
-        [InlineKeyboardButton(text="📈 График сообщений", callback_data="admin_messages_chart")]
+        [InlineKeyboardButton(text="📈 График сообщений", callback_data="admin_messages_chart")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")],
     ])
 

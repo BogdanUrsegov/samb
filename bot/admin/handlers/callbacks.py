@@ -181,16 +181,16 @@ async def admin_confirm_delete(callback: CallbackQuery):
         logger.exception(f"Error in admin_confirm_delete: {e}")
         await callback.answer("❌ Ошибка", show_alert=True)
 
-@router.callback_query(F.data == "admin_get_log")
-async def admin_get_log(callback: CallbackQuery, bot: Bot):
-    try:
-        from aiogram.types import FSInputFile
-        log_file = FSInputFile("/path/to/your/bot.log")  # ← УКАЖИ ПУТЬ К ЛОГУ
-        await bot.send_document(callback.message.chat.id, log_file, caption="📄 Лог-файл")
-        await callback.answer()
-    except Exception as e:
-        logger.exception(f"Error in admin_get_log: {e}")
-        await callback.answer("❌ Ошибка при получении лога", show_alert=True)
+# @router.callback_query(F.data == "admin_get_log")
+# async def admin_get_log(callback: CallbackQuery, bot: Bot):
+#     try:
+#         from aiogram.types import FSInputFile
+#         log_file = FSInputFile("/path/to/your/bot.log")  # ← УКАЖИ ПУТЬ К ЛОГУ
+#         await bot.send_document(callback.message.chat.id, log_file, caption="📄 Лог-файл")
+#         await callback.answer()
+#     except Exception as e:
+#         logger.exception(f"Error in admin_get_log: {e}")
+#         await callback.answer("❌ Ошибка при получении лога", show_alert=True)
 
 @router.callback_query(F.data == "admin_referrals")
 async def admin_referrals(callback: CallbackQuery):
