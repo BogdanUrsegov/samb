@@ -2,6 +2,7 @@ import asyncio
 import logging
 from bot.database.session import init_db, engine
 from .handlers import router
+from .referrals import router as referrals_router
 from bot.admin import admin_router
 from .create_bot import bot, ADMIN_ID, dp
 
@@ -21,7 +22,9 @@ async def main():
         
         # 2. Подключение роутеров
         dp.include_router(admin_router)
-
+        # Referral router must precede the legacy deep-link router. Its filter
+        # matches only /start ref_CODE, so ordinary user deep links are untouched.
+        dp.include_router(referrals_router)
         dp.include_router(router)
         
         # 3. Проверка и уведомление
