@@ -7,7 +7,6 @@ from decimal import Decimal, InvalidOperation
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from aiogram.utils.formatting import html_decoration
 
 from bot.admin.keyboards import admin_back_keyboard, referral_list_keyboard
 from bot.admin.states import AdminStates
@@ -19,6 +18,7 @@ from bot.database.utils import (
     get_referral_by_code,
     get_referral_stats,
 )
+from bot.utils.referral_ui import format_referral_stats, referral_stats_keyboard
 from bot.utils.referrals import normalize_referral_code, referral_payload
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,22 @@ async def _deny(callback: CallbackQuery) -> bool:
     if _is_admin(callback.from_user.id):
         return False
     await callback.answer("❌ Нет доступа", show_alert=True)
+    return True
+
+
+async def _render_admin_referral(callback: CallbackQuery, bot: Bot, referral_id: int) -> bool:
+    stats = await get_referral_stats(referral_id)
+    if not stats:
+        await callback.answer("❌ Реферальная ссылка не найдена", show_alert=True)
+        return False
+
+    bot_username = (await bot.me()).username
+    link = f"https://t.me/{bot_username}?start={referral_payload(stats['code'])}"
+    await callback.message.edit_text(
+        format_referral_stats(stats, link),
+        reply_markup=referral_stats_keyboard(referral_id, admin=True),
+        disable_web_page_preview=True,
+    )
     return True
 
 
@@ -124,8 +140,6 @@ async def process_referral_viewer(message: Message, state: FSMContext, bot: Bot)
 
     data = await state.get_data()
     code = data["referral_code"]
-
-    # created_by has an FK to users, so make sure the admin exists in the DB.
     user = message.from_user
     await add_user_if_not_exists(
         user.id,
@@ -146,7 +160,7 @@ async def process_referral_viewer(message: Message, state: FSMContext, bot: Bot)
         link = f"https://t.me/{bot_username}?start={referral_payload(code)}"
         await message.answer(
             "✅ <b>Реферальная ссылка создана</b>\n\n"
-            f"Название: <b>{html_decoration.quote(data['referral_name'])}</b>\n"
+            f"Название: <b>{data['referral_name']}</b>\n"
             f"Код: <code>{code}</code>\n"
             f"Цена за переход: <b>{data.get('referral_price') if data.get('referral_price') is not None else '—'}</b>\n"
             f"Viewer ID: <code>{viewer_id}</code>\n\n"
@@ -156,49 +170,27 @@ async def process_referral_viewer(message: Message, state: FSMContext, bot: Bot)
         )
     except Exception:
         logger.exception("Failed to create referral link '%s'", code)
-        await message.answer("❌ Не удалось создать ссылку. Возможно, код уже занят.", reply_markup=admin_back_keyboard())
+        await message.answer(
+            "❌ Не удалось создать ссылку. Возможно, код уже занят.",
+            reply_markup=admin_back_keyboard(),
+        )
     finally:
         await state.clear()
 
 
-@router.callback_query(F.data.startswith("admin_referral_"))
+@router.callback_query(F.data.regexp(r"^admin_referral_\d+$"))
 async def admin_referral_details(callback: CallbackQuery, bot: Bot):
     if await _deny(callback):
         return
-    try:
-        referral_id = int(callback.data.rsplit("_", 1)[1])
-    except (ValueError, IndexError):
-        return await callback.answer("❌ Некорректная ссылка", show_alert=True)
-
-    stats = await get_referral_stats(referral_id)
-    if not stats:
-        return await callback.answer("❌ Реферальная ссылка не найдена", show_alert=True)
-
-    bot_username = (await bot.me()).username
-    link = f"https://t.me/{bot_username}?start={referral_payload(stats['code'])}"
-    recent_lines = []
-    for click in stats.get("recent_clicks", []):
-        username = f"@{click['username']}" if click.get("username") else "без username"
-        recent_lines.append(
-            f"• <code>{click['user_id']}</code> — {html_decoration.quote(click.get('first_name') or 'Пользователь')} ({username})"
-        )
-
-    text = (
-        "🔗 <b>Реферальная ссылка</b>\n\n"
-        f"Название: <b>{html_decoration.quote(stats['name'])}</b>\n"
-        f"Код: <code>{stats['code']}</code>\n"
-        f"Переходов: <b>{stats['total_clicks']}</b>\n"
-        f"Цена: <b>{stats['price'] if stats.get('price') is not None else '—'}</b>\n"
-        f"Сумма: <b>{stats['total_amount'] if stats.get('total_amount') is not None else '—'}</b>\n"
-        f"Viewer ID: <code>{stats.get('viewer_id') or '—'}</code>\n\n"
-        f"🔗 <code>{link}</code>\n\n"
-        "<b>Последние переходы:</b>\n"
-        + ("\n".join(recent_lines) if recent_lines else "— пока нет переходов")
-    )
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=admin_back_keyboard(),
-        disable_web_page_preview=True,
-    )
+    referral_id = int(callback.data.rsplit("_", 1)[1])
+    await _render_admin_referral(callback, bot, referral_id)
     await callback.answer()
+
+
+@router.callback_query(F.data.regexp(r"^admin_referral_refresh_\d+$"))
+async def admin_referral_refresh(callback: CallbackQuery, bot: Bot):
+    if await _deny(callback):
+        return
+    referral_id = int(callback.data.rsplit("_", 1)[1])
+    if await _render_admin_referral(callback, bot, referral_id):
+        await callback.answer("🔄 Статистика обновлена")
