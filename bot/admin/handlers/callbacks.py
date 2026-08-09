@@ -266,8 +266,8 @@ async def admin_messages_chart(callback: CallbackQuery, bot: Bot):
         
         # Отправляем меню
         await callback.message.answer(
-            "📊 <b>Статистика сообщений</b>\n\nВыберите действие:",
-            reply_markup=admin_messages_menu_keyboard()
+            "📊 <b>Статистика</b>\n\nВыберите действие:",
+            reply_markup=admin_stats_keyboard()
         )
     except Exception as e:
         logger.exception(f"Error in admin_messages_chart: {e}")

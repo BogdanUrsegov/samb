@@ -45,8 +45,8 @@ router = Router()
 
 # Конфигурация
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
-PRICE_WEEKLY_RUB = int(os.getenv("PRICE_WEEKLY_RUB", 50))
-PRICE_MONTHLY_RUB = int(os.getenv("PRICE_MONTHLY_RUB", 100))
+PRICE_WEEKLY_RUB = int(os.getenv("PRICE_WEEKLY_RUB", 100))
+PRICE_MONTHLY_RUB = int(os.getenv("PRICE_MONTHLY_RUB", 150))
 PRICE_FOREVER_RUB = int(os.getenv("PRICE_FOREVER_RUB", 200))
 
 # Словари для оптимизации повторяющихся данных
