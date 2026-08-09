@@ -8,8 +8,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="⭐ Добавить VIP", callback_data="admin_add_vip")],
         [InlineKeyboardButton(text="❌ Удалить VIP", callback_data="admin_remove_vip")],
         [InlineKeyboardButton(text="🔗 Реферальные ссылки", callback_data="admin_referrals")],
-        [InlineKeyboardButton(text="🗑️ Удалить пользователя", callback_data="admin_delete_user")],
-        [InlineKeyboardButton(text="📄 Получить лог", callback_data="admin_get_log")],
+        [InlineKeyboardButton(text="🗑️ Удалить пользователя", callback_data="admin_delete_user")]
     ])
 
 def admin_back_keyboard() -> InlineKeyboardMarkup:
@@ -20,8 +19,7 @@ def admin_back_keyboard() -> InlineKeyboardMarkup:
 def admin_stats_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 График роста", callback_data="admin_growth_chart")],
-        [InlineKeyboardButton(text="📈 График сообщений", callback_data="admin_messages_chart")],
-        [InlineKeyboardButton(text="📋 Список пользователей", callback_data="admin_users_list")],
+        [InlineKeyboardButton(text="📈 График сообщений", callback_data="admin_messages_chart")]
         [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")],
     ])
 

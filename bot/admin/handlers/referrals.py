@@ -9,13 +9,12 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from bot.admin.keyboards import admin_back_keyboard, referral_list_keyboard
+from bot.admin.keyboards import admin_back_keyboard
 from bot.admin.states import AdminStates
 from bot.create_bot import ADMIN_ID
 from bot.database.utils import (
     add_user_if_not_exists,
     create_referral_link,
-    get_all_referral_links,
     get_referral_by_code,
     get_referral_stats,
 )
@@ -117,7 +116,7 @@ async def process_referral_price(message: Message, state: FSMContext):
         try:
             price = float(Decimal(value.replace(",", ".")))
         except (InvalidOperation, ValueError):
-            await message.reply("❌ Введите число, например `25.50`, или `-`.")
+            await message.reply("❌ Введите число, например `3.5` или `-`.")
             return
         if price < 0:
             await message.reply("❌ Цена не может быть отрицательной.")
@@ -125,7 +124,7 @@ async def process_referral_price(message: Message, state: FSMContext):
     await state.update_data(referral_price=price)
     await state.set_state(AdminStates.waiting_for_referral_viewer)
     await message.answer(
-        "Введите Telegram ID пользователя, которому показывать статистику, или `-`.",
+        "Введите Telegram ID пользователя, которому показывать статистику или `-`.",
         reply_markup=admin_back_keyboard(),
     )
 
