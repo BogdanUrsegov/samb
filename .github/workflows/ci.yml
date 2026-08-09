@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python sources
+        run: python -m compileall -q bot tests
+      - name: Referral helper tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Import smoke check
+        env:
+          BOT_TOKEN: "123456:TEST_TOKEN"
+          ADMIN_ID: "1"
+        run: |
+          python -c "import bot.referrals; import bot.admin.handlers.referrals; import bot.main"
