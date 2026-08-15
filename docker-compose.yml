@@ -6,10 +6,10 @@ services:
     env_file:
       - .env
     environment:
-      - PYTHONUNBUFFERED=1  # 👈 Отключает буферизацию логов
-      - PYTHONPATH=/app     # 👈 Явно указываем путь
+      - PYTHONUNBUFFERED=1  # Отключает буферизацию логов
+      - PYTHONPATH=/app     # Явно указываем путь
     ports:
-      - "8008:8008"
+      - "8009:8009"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
