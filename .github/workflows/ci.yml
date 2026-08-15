@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main, feature/**, refactor/**]
   pull_request:
 
 jobs:
@@ -24,4 +24,4 @@ jobs:
           BOT_TOKEN: "123456:TEST_TOKEN"
           ADMIN_ID: "1"
         run: |
-          python -c "import bot.referrals; import bot.admin.handlers.referrals; import bot.main"
+          python -c "import bot.referrals; import bot.admin.handlers.admin; import bot.main"
