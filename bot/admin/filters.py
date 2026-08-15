@@ -9,4 +9,7 @@ class IsAdmin(BaseFilter):
 
     async def __call__(self, event: Message | CallbackQuery) -> bool:
         user = event.from_user
-        return bool(user and await is_admin(user.id))
+        allowed = bool(user and await is_admin(user.id))
+        if not allowed and isinstance(event, CallbackQuery):
+            await event.answer("❌ Нет прав", show_alert=True)
+        return allowed
