@@ -5,7 +5,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from bot.admin.keyboards import admin_manage_back_keyboard, admin_manage_keyboard, admin_back_keyboard
+from bot.admin.keyboards import admin_manage_back_keyboard, admin_manage_keyboard
 from bot.admin.states import AdminStates
 from bot.database.admins import add_admin, get_admins, is_superadmin, remove_admin
 

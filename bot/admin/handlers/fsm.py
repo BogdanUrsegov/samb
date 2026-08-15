@@ -6,7 +6,6 @@ from bot.admin.keyboards import admin_back_keyboard, user_actions_keyboard, vip_
 from bot.admin.states import AdminStates
 from bot.database.utils import (
     get_user_stats,
-    add_or_update_subscription,
     remove_subscription,
     delete_user_by_id,
 )

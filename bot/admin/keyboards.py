@@ -20,7 +20,7 @@ def admin_manage_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Добавить администратора", callback_data="admin_add")],
         [InlineKeyboardButton(text="➖ Удалить администратора", callback_data="admin_remove")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_manage_back")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")],
     ])
 
 

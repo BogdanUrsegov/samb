@@ -12,7 +12,7 @@ from bot.database.admins import is_superadmin
 from bot.database.utils import (
     count_all_users, get_all_user_ids,
     add_or_update_subscription, remove_subscription, delete_user_by_id,
-    get_subscription, get_user_growth_data, get_message_count_data,
+    get_user_growth_data, get_message_count_data,
 )
 from bot.utils.charts import generate_user_growth_chart, generate_message_count_chart
 
@@ -22,12 +22,14 @@ router = Router()
 @router.callback_query(F.data == "admin_back")
 async def admin_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    if not await is_superadmin(callback.from_user.id):
-        await callback.answer("❌ Нет прав", show_alert=True)
-        return
+    is_super = False
+
+    if await is_superadmin(callback.from_user.id):
+        is_super = True
+
     await callback.message.edit_text(
         "👨‍💼 <b>Админ-панель</b>\n\nВыберите действие:",
-        reply_markup=admin_menu_keyboard(True),
+        reply_markup=admin_menu_keyboard(is_super),
     )
     await callback.answer()
 
