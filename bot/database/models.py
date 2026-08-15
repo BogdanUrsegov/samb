@@ -85,3 +85,12 @@ class ReferralClick(Base):
     __table_args__ = (
         Index("idx_referral_clicks_referral_id", "referral_id"),
     )
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+    added_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
