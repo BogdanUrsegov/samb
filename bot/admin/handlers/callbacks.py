@@ -22,23 +22,25 @@ router = Router()
 @router.callback_query(F.data == "admin_back")
 async def admin_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    if await is_superadmin(callback.from_user.id):
-        await callback.message.edit_text(
-            "👨‍💼 <b>Админ-панель</b>\n\nВыберите действие:",
-            reply_markup=admin_menu_keyboard(True),
-        )
-    else:
+    if not await is_superadmin(callback.from_user.id):
         await callback.answer("❌ Нет прав", show_alert=True)
         return
+    await callback.message.edit_text(
+        "👨‍💼 <b>Админ-панель</b>\n\nВыберите действие:",
+        reply_markup=admin_menu_keyboard(True),
+    )
     await callback.answer()
 
 @router.callback_query(F.data == "admin_stats")
 async def admin_stats(callback: CallbackQuery):
     try:
         total = await count_all_users()
+        
+        # Получаем статистику по подпискам
         from bot.database.utils import get_subscription_plans
         subs = await get_subscription_plans()
         vip_count = subs.get("weekly", 0) + subs.get("monthly", 0) + subs.get("forever", 0)
+        
         text = (
             f"📊 <b>Статистика бота</b>\n\n"
             f"👥 Всего пользователей: <b>{total}</b>\n"
@@ -48,6 +50,7 @@ async def admin_stats(callback: CallbackQuery):
             f"🔹 Месяц: {subs.get('monthly', 0)}\n"
             f"🔹 Навсегда: {subs.get('forever', 0)}"
         )
+        
         await callback.message.edit_text(text, reply_markup=admin_stats_keyboard())
         await callback.answer()
     except Exception as e:
@@ -58,11 +61,15 @@ async def admin_stats(callback: CallbackQuery):
 async def admin_users_list(callback: CallbackQuery, bot: Bot):
     try:
         user_ids = await get_all_user_ids()
+        
         if not user_ids:
             await callback.answer("📂 База пуста", show_alert=True)
             return
+        
+        # Создаем файл со списком ID
         ids_text = "\n".join(str(uid) for uid in user_ids)
         file = BufferedInputFile(ids_text.encode("utf-8"), filename="user_ids.txt")
+        
         await callback.message.edit_text(
             f"📋 <b>Список пользователей</b>\n\nВсего: <b>{len(user_ids)}</b>\n\nФайл отправлен ниже ⬇️",
             reply_markup=admin_back_keyboard()
@@ -80,102 +87,195 @@ async def admin_users_list(callback: CallbackQuery, bot: Bot):
 @router.callback_query(F.data == "admin_user_info")
 async def admin_user_info(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_user_id)
-    await callback.message.edit_text("👤 <b>Информация о пользователе</b>\n\nВведите Telegram ID пользователя:", reply_markup=admin_back_keyboard())
+    await callback.message.edit_text(
+        "👤 <b>Информация о пользователе</b>\n\nВведите ID пользователя:",
+        reply_markup=admin_back_keyboard()
+    )
     await callback.answer()
 
 @router.callback_query(F.data == "admin_add_vip")
 async def admin_add_vip(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(AdminStates.waiting_for_vip_user_id)
-    await callback.message.edit_text("⭐ <b>Добавление VIP</b>\n\nВведите Telegram ID пользователя:", reply_markup=admin_back_keyboard())
+    await state.set_state(AdminStates.waiting_for_vip_user)
+    await callback.message.edit_text(
+        "⭐ <b>Добавление VIP</b>\n\nВведите ID пользователя:",
+        reply_markup=admin_back_keyboard()
+    )
     await callback.answer()
 
 @router.callback_query(F.data == "admin_remove_vip")
 async def admin_remove_vip(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(AdminStates.waiting_for_vip_remove_user_id)
-    await callback.message.edit_text("❌ <b>Удаление VIP</b>\n\nВведите Telegram ID пользователя:", reply_markup=admin_back_keyboard())
+    await state.set_state(AdminStates.waiting_for_remove_vip_user)
+    await callback.message.edit_text(
+        "❌ <b>Удаление VIP</b>\n\nВведите ID пользователя:",
+        reply_markup=admin_back_keyboard()
+    )
     await callback.answer()
+
+@router.callback_query(F.data == "admin_delete_user")
+async def admin_delete_user(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminStates.waiting_for_delete_user)
+    await callback.message.edit_text(
+        "🗑️ <b>Удаление пользователя</b>\n\n⚠️ <b>ВНИМАНИЕ:</b> Это действие необратимо!\n\nВведите ID пользователя:",
+        reply_markup=admin_back_keyboard()
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("admin_vip_"))
+async def admin_set_vip(callback: CallbackQuery, bot: Bot):
+    try:
+        parts = callback.data.split("_")
+        plan = parts[2]
+        user_id = int(parts[3])
+        
+        await add_or_update_subscription(user_id, plan)
+        
+        await callback.message.edit_text(
+            f"✅ <b>VIP добавлен</b>\n\n"
+            f"Пользователь: <code>{user_id}</code>\n"
+            f"План: <b>{plan}</b>",
+            reply_markup=admin_back_keyboard()
+        )
+
+        await bot.send_message(user_id, 
+                               f"✅ <b>Вам выдали VIP подписку</b>\n\n"
+                               "<i>Теперь вы можете посмотреть кто вам написал!</i>"
+                               )
+        await callback.answer("✅ Готово!")
+    except Exception as e:
+        logger.exception(f"Error in admin_set_vip: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+
+@router.callback_query(F.data.startswith("admin_add_vip_user_"))
+async def admin_add_vip_user(callback: CallbackQuery):
+    try:
+        user_id = int(callback.data.split("_")[-1])
+        await callback.message.edit_text(
+            f"⭐ <b>Выберите план VIP</b> для пользователя <code>{user_id}</code>:",
+            reply_markup=vip_plans_keyboard(user_id)
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.exception(f"Error in admin_add_vip_user: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+
+@router.callback_query(F.data.startswith("admin_remove_vip_user_"))
+async def admin_remove_vip_user(callback: CallbackQuery):
+    try:
+        user_id = int(callback.data.split("_")[-1])
+        await remove_subscription(user_id)
+        
+        await callback.message.edit_text(
+            f"❌ <b>VIP удалён</b>\n\nПользователь: <code>{user_id}</code>",
+            reply_markup=admin_back_keyboard()
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.exception(f"Error in admin_remove_vip_user: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+
+@router.callback_query(F.data.startswith("admin_confirm_delete_"))
+async def admin_confirm_delete(callback: CallbackQuery):
+    try:
+        user_id = int(callback.data.split("_")[-1])
+        await delete_user_by_id(user_id)
+        
+        await callback.message.edit_text(
+            f"🗑️ <b>Пользователь удалён</b>\n\nID: <code>{user_id}</code>",
+            reply_markup=admin_back_keyboard()
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.exception(f"Error in admin_confirm_delete: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+
+# @router.callback_query(F.data == "admin_get_log")
+# async def admin_get_log(callback: CallbackQuery, bot: Bot):
+#     try:
+#         from aiogram.types import FSInputFile
+#         log_file = FSInputFile("/path/to/your/bot.log")  # ← УКАЖИ ПУТЬ К ЛОГУ
+#         await bot.send_document(callback.message.chat.id, log_file, caption="📄 Лог-файл")
+#         await callback.answer()
+#     except Exception as e:
+#         logger.exception(f"Error in admin_get_log: {e}")
+#         await callback.answer("❌ Ошибка при получении лога", show_alert=True)
 
 @router.callback_query(F.data == "admin_referrals")
 async def admin_referrals(callback: CallbackQuery):
     try:
-        from bot.database.referrals import get_all_referral_links
+        from bot.database.utils import get_all_referral_links
         referrals = await get_all_referral_links()
-        await callback.message.edit_text("🔗 <b>Реферальные ссылки</b>", reply_markup=referral_list_keyboard(referrals))
+        
+        await callback.message.edit_text(
+            "🔗 <b>Реферальные ссылки</b>\n\nВыберите ссылку или создайте новую:",
+            reply_markup=referral_list_keyboard(referrals)
+        )
         await callback.answer()
     except Exception as e:
         logger.exception(f"Error in admin_referrals: {e}")
         await callback.answer("❌ Ошибка", show_alert=True)
 
-@router.callback_query(F.data == "admin_delete_user")
-async def admin_delete_user(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(AdminStates.waiting_for_delete_user_id)
-    await callback.message.edit_text("🗑️ <b>Удаление пользователя</b>\n\nВведите Telegram ID пользователя:", reply_markup=admin_back_keyboard())
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("admin_confirm_delete_"))
-async def admin_confirm_delete(callback: CallbackQuery):
-    user_id = int(callback.data.split("_")[-1])
-    await callback.message.edit_text(
-        f"🗑️ Пользователь <code>{user_id}</code> удалён.",
-        reply_markup=admin_back_keyboard()
-    )
-    await delete_user_by_id(user_id)
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("admin_vip_"))
-async def admin_vip_plan(callback: CallbackQuery):
-    parts = callback.data.split("_")
-    plan = parts[2]
-    user_id = int(parts[3])
-    await add_or_update_subscription(user_id, plan)
-    await callback.message.edit_text(f"⭐ VIP {plan} выдан пользователю <code>{user_id}</code>", reply_markup=admin_back_keyboard())
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("admin_add_vip_user_"))
-async def admin_add_vip_user(callback: CallbackQuery):
-    user_id = int(callback.data.split("_")[-1])
-    await callback.message.edit_text("Выберите срок VIP:", reply_markup=vip_plans_keyboard(user_id))
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("admin_remove_vip_user_"))
-async def admin_remove_vip_user(callback: CallbackQuery):
-    user_id = int(callback.data.split("_")[-1])
-    await remove_subscription(user_id)
-    await callback.message.edit_text(f"❌ VIP снят с пользователя <code>{user_id}</code>", reply_markup=admin_back_keyboard())
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("admin_referral_"))
-async def admin_referral(callback: CallbackQuery):
-    from bot.database.referrals import get_referral_link
-    ref_id = int(callback.data.split("_")[-1])
-    ref = await get_referral_link(ref_id)
-    if not ref:
-        await callback.answer("❌ Ссылка не найдена", show_alert=True)
-        return
-    await callback.message.edit_text(
-        f"🔗 <b>{ref['name']}</b>\n\nПереходов: <b>{ref['clicks']}</b>\nПользователей: <b>{ref['registrations']}</b>",
-        reply_markup=admin_back_keyboard(),
-    )
-    await callback.answer()
-
 @router.callback_query(F.data == "admin_growth_chart")
-async def admin_growth_chart(callback: CallbackQuery):
+async def admin_growth_chart(callback: CallbackQuery, bot: Bot):
     try:
-        data = await get_user_growth_data()
-        chart = generate_user_growth_chart(data)
-        await callback.message.answer_photo(chart, caption="📈 Рост пользователей")
-        await callback.answer()
+        await callback.answer("📊 Генерирую график...")
+        
+        # Получаем данные за 7 дней
+        growth_data = await get_user_growth_data(days=7)
+        
+        # Генерируем график
+        chart_buf = await generate_user_growth_chart(growth_data)
+        chart_file = BufferedInputFile(chart_buf.getvalue(), filename="user_growth.png")
+        
+        # Отправляем график
+        await bot.send_photo(
+            callback.message.chat.id,
+            chart_file,
+            caption="📊 <b>График роста пользователей за неделю</b>"
+        )
+        
+        # Отправляем файл со списком ID
+        user_ids = await get_all_user_ids()
+        ids_text = "\n".join(str(uid) for uid in user_ids)
+        file = BufferedInputFile(ids_text.encode("utf-8"), filename="user_ids.txt")
+        await bot.send_document(
+            callback.message.chat.id,
+            file,
+            caption=f"📄 Список ID ({len(user_ids)} шт.)"
+        )
+        
+        # Отправляем меню
+        await callback.message.answer(
+            "📊 <b>Статистика</b>\n\nВыберите действие:",
+            reply_markup=admin_stats_keyboard()
+        )
     except Exception as e:
-        logger.exception(f"Error in growth chart: {e}")
-        await callback.answer("❌ Ошибка", show_alert=True)
+        logger.exception(f"Error in admin_growth_chart: {e}")
+        await callback.answer("❌ Ошибка при генерации графика", show_alert=True)
 
 @router.callback_query(F.data == "admin_messages_chart")
-async def admin_messages_chart(callback: CallbackQuery):
+async def admin_messages_chart(callback: CallbackQuery, bot: Bot):
     try:
-        data = await get_message_count_data()
-        chart = generate_message_count_chart(data)
-        await callback.message.answer_photo(chart, caption="📊 Сообщения")
-        await callback.answer()
+        await callback.answer("📈 Генерирую график...")
+        
+        # Получаем данные за 7 дней
+        messages_data = await get_message_count_data(days=7)
+        
+        # Генерируем график
+        chart_buf = await generate_message_count_chart(messages_data)
+        chart_file = BufferedInputFile(chart_buf.getvalue(), filename="messages.png")
+        
+        # Отправляем график
+        await bot.send_photo(
+            callback.message.chat.id,
+            chart_file,
+            caption="📈 <b>График отправленных сообщений за неделю</b>"
+        )
+        
+        # Отправляем меню
+        await callback.message.answer(
+            "📊 <b>Статистика</b>\n\nВыберите действие:",
+            reply_markup=admin_stats_keyboard()
+        )
     except Exception as e:
         logger.exception(f"Error in messages chart: {e}")
-        await callback.answer("❌ Ошибка", show_alert=True)
+        await callback.answer("❌ Ошибка при генерации графика", show_alert=True)
