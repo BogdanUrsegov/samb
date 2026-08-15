@@ -5,7 +5,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from bot.admin.keyboards import admin_back_keyboard, admin_manage_keyboard
+from bot.admin.keyboards import admin_manage_back_keyboard, admin_manage_keyboard, admin_back_keyboard
 from bot.admin.states import AdminStates
 from bot.database.admins import add_admin, get_admins, is_superadmin, remove_admin
 
@@ -39,6 +39,15 @@ async def admin_manage(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "admin_manage_back")
+async def admin_manage_back(callback: CallbackQuery):
+    if not await is_superadmin(callback.from_user.id):
+        await callback.answer("❌ Нет прав", show_alert=True)
+        return
+    await callback.message.edit_text(await _manage_text(), reply_markup=admin_manage_keyboard())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "admin_add")
 async def admin_add_start(callback: CallbackQuery, state: FSMContext):
     if not await is_superadmin(callback.from_user.id):
@@ -47,7 +56,7 @@ async def admin_add_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_admin_id)
     await callback.message.edit_text(
         "➕ <b>Добавление администратора</b>\n\nВведите Telegram ID пользователя:",
-        reply_markup=admin_back_keyboard(),
+        reply_markup=admin_manage_back_keyboard(),
     )
     await callback.answer()
 
@@ -88,7 +97,7 @@ async def admin_remove_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_remove_admin_id)
     await callback.message.edit_text(
         "➖ <b>Удаление администратора</b>\n\nВведите Telegram ID пользователя:\n\n⚠️ Главного администратора удалить нельзя.",
-        reply_markup=admin_back_keyboard(),
+        reply_markup=admin_manage_back_keyboard(),
     )
     await callback.answer()
 
