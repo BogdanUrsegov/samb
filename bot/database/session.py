@@ -1,40 +1,66 @@
 # bot/database/session.py
-import os
-from sqlalchemy import event
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Base
-from .admins import ensure_superadmin
 import logging
+import os
+
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from .admins import ensure_superadmin
+from .models import Base
 
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/database.db")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# SQLite has a single writer. Keep one pooled connection in this process so
+# concurrent async handlers cannot create competing SQLite write transactions.
+# A generous SQLite timeout remains important for startup / external processes.
+_engine_kwargs = {"echo": False, "pool_pre_ping": True}
+if DATABASE_URL.startswith("sqlite"):
+    _engine_kwargs.update(
+        pool_size=1,
+        max_overflow=0,
+        pool_timeout=30,
+        connect_args={"timeout": 30},
+    )
+
+engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
+
 
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    """Configure every SQLite connection for concurrent bot workloads."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
+
+
+async_session = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 async def init_db() -> None:
-    """Создаёт таблицы и настраивает PRAGMA."""
+    """Create tables and initialize the database safely."""
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("PRAGMA journal_mode=WAL;"))
-            await conn.execute(text("PRAGMA busy_timeout=5000;"))
+            if DATABASE_URL.startswith("sqlite"):
+                await conn.execute(text("PRAGMA journal_mode=WAL"))
+                await conn.execute(text("PRAGMA synchronous=NORMAL"))
+                await conn.execute(text("PRAGMA busy_timeout=30000"))
+                await conn.execute(text("PRAGMA foreign_keys=ON"))
             await conn.run_sync(Base.metadata.create_all)
 
-        # ADMIN_ID остаётся bootstrap/root-доступом, но после инициализации
-        # все проверки админки выполняются через таблицу admins.
         admin_id = os.getenv("ADMIN_ID")
         if admin_id:
             try:
@@ -47,28 +73,5 @@ async def init_db() -> None:
 
         logger.info("Инициализация БД завершена успешно")
     except Exception as e:
-        logger.exception(f"Ошибка при инициализации БД: {e}")
+        logger.exception("Ошибка при инициализации БД: %s", e)
         raise
-
-# engine = create_async_engine(
-#     DATABASE_URL,
-#     echo=False,
-#     connect_args={"check_same_thread": False},
-#     pool_pre_ping=True,
-# )
-
-# # Фабрика сессий
-# AsyncSessionLocal = async_sessionmaker(
-#     bind=engine,
-#     expire_on_commit=False,
-# )
-
-# async def init_db():
-#     """Создаёт таблицы, если их нет."""
-#     try:
-#         async with engine.begin() as conn:
-#             await conn.run_sync(Base.metadata.create_all)
-#             logger.info(f"Таблицы успешно созданы/обновлены в {DATABASE_URL}")
-#     except Exception as e:
-#         logger.error(f"Ошибка инициализации БД: {e}")
-#         raise
