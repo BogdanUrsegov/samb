@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import Router, F, Bot
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -30,12 +30,24 @@ async def _notify_admin(bot: Bot, user_id: int, text: str) -> None:
         logger.info("Не удалось отправить уведомление пользователю %s: %s", user_id, exc)
 
 
+async def _show_manage_menu(callback: CallbackQuery) -> None:
+    """Render the admin-management menu; ignore Telegram's 'message is not modified'."""
+    try:
+        await callback.message.edit_text(
+            await _manage_text(),
+            reply_markup=admin_manage_keyboard(),
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
+
+
 @router.callback_query(F.data == "admin_manage")
 async def admin_manage(callback: CallbackQuery):
     if not await is_superadmin(callback.from_user.id):
         await callback.answer("❌ Недостаточно прав", show_alert=True)
         return
-    await callback.message.edit_text(await _manage_text(), reply_markup=admin_manage_keyboard())
+    await _show_manage_menu(callback)
     await callback.answer()
 
 
@@ -44,7 +56,7 @@ async def admin_manage_back(callback: CallbackQuery):
     if not await is_superadmin(callback.from_user.id):
         await callback.answer("❌ Нет прав", show_alert=True)
         return
-    await callback.message.edit_text(await _manage_text(), reply_markup=admin_manage_keyboard())
+    await _show_manage_menu(callback)
     await callback.answer()
 
 
