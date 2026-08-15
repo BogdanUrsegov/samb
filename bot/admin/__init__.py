@@ -1,8 +1,13 @@
 from aiogram import Router
 from bot.admin.handlers import callbacks, commands, fsm, referrals
+from bot.admin.filters import IsAdmin
 
 # Создаем главный роутер админки
 admin_router = Router()
+
+# Все handlers админки доступны только пользователям из таблицы admins.
+admin_router.message.filter(IsAdmin())
+admin_router.callback_query.filter(IsAdmin())
 
 # Подключаем все роутеры админки
 admin_router.include_router(callbacks.router)
