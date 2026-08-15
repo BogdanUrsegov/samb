@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Base
+from .admins import ensure_superadmin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,19 @@ async def init_db() -> None:
             await conn.execute(text("PRAGMA journal_mode=WAL;"))
             await conn.execute(text("PRAGMA busy_timeout=5000;"))
             await conn.run_sync(Base.metadata.create_all)
+
+        # ADMIN_ID остаётся bootstrap/root-доступом, но после инициализации
+        # все проверки админки выполняются через таблицу admins.
+        admin_id = os.getenv("ADMIN_ID")
+        if admin_id:
+            try:
+                await ensure_superadmin(int(admin_id))
+            except ValueError:
+                logger.error("ADMIN_ID должен быть числом: %r", admin_id)
+                raise
+        else:
+            logger.warning("ADMIN_ID не задан — главный администратор не был создан")
+
         logger.info("Инициализация БД завершена успешно")
     except Exception as e:
         logger.exception(f"Ошибка при инициализации БД: {e}")
