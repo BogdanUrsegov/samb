@@ -1,5 +1,6 @@
 from aiogram.fsm.state import State, StatesGroup
 
+
 class AdminStates(StatesGroup):
     waiting_for_user_id = State()
     waiting_for_vip_user = State()
@@ -10,3 +11,5 @@ class AdminStates(StatesGroup):
     waiting_for_referral_code = State()
     waiting_for_referral_price = State()
     waiting_for_referral_viewer = State()
+    waiting_for_admin_id = State()
+    waiting_for_remove_admin_id = State()
