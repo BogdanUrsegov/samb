@@ -18,7 +18,7 @@ engine = create_async_engine(DATABASE_URL, echo=False)
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA busy_timeout=30000")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
@@ -30,10 +30,9 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             await conn.execute(text("PRAGMA journal_mode=WAL;"))
-            await conn.execute(text("PRAGMA busy_timeout=5000;"))
+            await conn.execute(text("PRAGMA busy_timeout=30000;"))
             await conn.run_sync(Base.metadata.create_all)
 
-        # ADMIN_ID остаётся bootstrap/root-доступом, но после инициализации
         # все проверки админки выполняются через таблицу admins.
         admin_id = os.getenv("ADMIN_ID")
         if admin_id:
@@ -49,26 +48,3 @@ async def init_db() -> None:
     except Exception as e:
         logger.exception(f"Ошибка при инициализации БД: {e}")
         raise
-
-# engine = create_async_engine(
-#     DATABASE_URL,
-#     echo=False,
-#     connect_args={"check_same_thread": False},
-#     pool_pre_ping=True,
-# )
-
-# # Фабрика сессий
-# AsyncSessionLocal = async_sessionmaker(
-#     bind=engine,
-#     expire_on_commit=False,
-# )
-
-# async def init_db():
-#     """Создаёт таблицы, если их нет."""
-#     try:
-#         async with engine.begin() as conn:
-#             await conn.run_sync(Base.metadata.create_all)
-#             logger.info(f"Таблицы успешно созданы/обновлены в {DATABASE_URL}")
-#     except Exception as e:
-#         logger.error(f"Ошибка инициализации БД: {e}")
-#         raise
