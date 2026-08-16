@@ -15,7 +15,6 @@ async def show_advert(user_id):
                 },
                 json={"SendToChatId": user_id},
             ) as response:
-                print(response.content)
                 if not response.ok:
                     logger.error("Gramads: %s" % str(await response.json()))
     except Exception as e:
