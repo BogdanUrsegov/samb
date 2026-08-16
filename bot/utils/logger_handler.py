@@ -1,15 +1,14 @@
 """Logging of application errors and business events to Telegram."""
 
-import asyncio
 import logging
-import sys
 import traceback
 from typing import Optional
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 from aiogram.utils.formatting import html_decoration
+
+from .telegram_log_dispatcher import TelegramLogDispatcher, TelegramLogEvent
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +49,9 @@ def format_error_message(
     """Build a compact Telegram-readable error report."""
     error_type = type(error).__name__
     error_message = _truncate(str(error) or "Без сообщения", 700)
-
     location = ""
-    tb = error.__traceback__
-    if tb is not None:
-        frames = traceback.extract_tb(tb)
+    if error.__traceback__ is not None:
+        frames = traceback.extract_tb(error.__traceback__)
         if frames:
             frame = frames[-1]
             location = f"{frame.filename}:{frame.lineno} → {frame.name}()"
@@ -75,8 +72,7 @@ def format_error_message(
 
     tb_text = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     if tb_text:
-        tb_text = _truncate(tb_text, MAX_TRACEBACK_LENGTH)
-        lines.append(f"<pre>{_escape(tb_text)}</pre>")
+        lines.append(f"<pre>{_escape(_truncate(tb_text, MAX_TRACEBACK_LENGTH))}</pre>")
 
     return _truncate("\n".join(lines), MAX_TELEGRAM_LOG_LENGTH)
 
@@ -88,50 +84,35 @@ class TelegramLoggerHandler(logging.Handler):
         super().__init__(level)
         self.bot = bot
         self.chat_id = chat_id
-        self._queue: asyncio.Queue[logging.LogRecord] = asyncio.Queue()
-        self._task: Optional[asyncio.Task] = None
+        self._logger = logging.getLogger("telegram_log_handler")
 
     def emit(self, record: logging.LogRecord) -> None:
+        # This handler is retained for compatibility with existing logging setup.
+        # Business events and application errors use TelegramEventLogger's dispatcher.
         try:
-            self._queue.put_nowait(record)
-        except RuntimeError:
-            print("Failed to queue Telegram log: event loop is not running", file=sys.stderr)
-
-    async def start(self) -> None:
-        if self._task is None:
-            self._task = asyncio.create_task(self._process_logs())
-
-    async def stop(self) -> None:
-        if self._task is None:
-            return
-        self._task.cancel()
-        try:
-            await self._task
-        except asyncio.CancelledError:
-            pass
-        self._task = None
-
-    async def _process_logs(self) -> None:
-        while True:
-            record = await self._queue.get()
-            try:
-                message = self.format(record)
-                await self.bot.send_message(self.chat_id, message, disable_notification=True)
-            except TelegramAPIError as exc:
-                print(f"Failed to send Telegram log: {exc}", file=sys.stderr)
-            except Exception as exc:
-                print(f"Telegram logger failed: {exc}", file=sys.stderr)
-            finally:
-                self._queue.task_done()
+            self._logger.log(record.levelno, self.format(record))
+        except Exception:
+            self._logger.exception("Failed to process Telegram log record")
 
 
 class TelegramEventLogger:
-    """Sends compact business events and application errors to a Telegram channel."""
+    """Queues all business events for ordered, throttled delivery to Telegram."""
 
     def __init__(self, bot: Bot, chat_id: Optional[int | str]):
         self.bot = bot
         self.chat_id = int(chat_id) if chat_id else None
         self.logger = logging.getLogger("telegram_events")
+        self.dispatcher: Optional[TelegramLogDispatcher] = None
+        if self.chat_id is not None:
+            self.dispatcher = TelegramLogDispatcher(bot, self.chat_id)
+
+    async def start(self) -> None:
+        if self.dispatcher is not None:
+            await self.dispatcher.start()
+
+    async def stop(self) -> None:
+        if self.dispatcher is not None:
+            await self.dispatcher.stop()
 
     async def log_new_user(self, user_id: int, username: Optional[str], first_name: str) -> None:
         message = f"👤 <b>Новый пользователь</b>\n\n{_format_user_info(user_id, first_name, username)}"
@@ -228,24 +209,12 @@ class TelegramEventLogger:
     async def _send_event(
         self, message: str, message_to_forward: Optional[Message] = None
     ) -> Optional[Message]:
-        if self.chat_id is None:
+        if self.dispatcher is None:
             return None
-        try:
-            if message_to_forward:
-                try:
-                    await self.bot.forward_message(
-                        chat_id=self.chat_id,
-                        from_chat_id=message_to_forward.chat.id,
-                        message_id=message_to_forward.message_id,
-                        disable_notification=True,
-                    )
-                except TelegramAPIError as exc:
-                    self.logger.warning("Could not forward event message: %s", exc)
-            return await self.bot.send_message(
-                chat_id=self.chat_id,
-                text=_truncate(message, MAX_TELEGRAM_LOG_LENGTH),
-                disable_notification=True,
-            )
-        except Exception as exc:
-            self.logger.error("Failed to send event to Telegram: %s", exc)
-            return None
+        event = TelegramLogEvent(
+            text=_truncate(message, MAX_TELEGRAM_LOG_LENGTH),
+            message_to_forward=message_to_forward,
+        )
+        await self.dispatcher.enqueue(event)
+        # Preserve the old contract: the channel send itself is asynchronous.
+        return None
