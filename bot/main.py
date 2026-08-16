@@ -15,12 +15,10 @@ logger = logging.getLogger(__name__)
 
 @dp.errors()
 async def handle_update_error(event: ErrorEvent):
-    """Log unhandled update errors with the handler/action and update context."""
+    """Log unhandled update errors with handler/action and update context."""
     update = event.update
     user = getattr(update, "from_user", None)
-    action = "unknown"
-    if user:
-        action = f"Telegram update from user {user.id}"
+    action = f"Telegram update from user {user.id}" if user else "Telegram update"
 
     try:
         await event_logger.log_error(
@@ -45,6 +43,9 @@ async def main():
         dp.include_router(referrals_router)
         dp.include_router(router)
 
+        # Start the single ordered dispatcher before any business event can be logged.
+        await event_logger.start()
+
         me = await bot.get_me()
         logger.info("Bot started as @%s", me.username)
         try:
@@ -65,6 +66,8 @@ async def main():
             logger.exception("Failed to report application error to Telegram")
         raise
     finally:
+        # Drain accepted Telegram log events before closing the bot session.
+        await event_logger.stop()
         await bot.session.close()
         await engine.dispose()
         logger.info("Bot stopped")
