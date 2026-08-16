@@ -12,7 +12,16 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/database.db")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# SQLite permits only one writer at a time. Keep a single pooled connection so
+# concurrent async handlers cannot open competing write transactions.
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    connect_args={"timeout": 30},
+    pool_size=1,
+    max_overflow=0,
+    pool_timeout=30,
+)
 
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
