@@ -1,51 +1,77 @@
 import asyncio
 import logging
-from bot.database.session import init_db, engine
+
+from aiogram.types import ErrorEvent
+
+from bot.admin import admin_router
+from bot.config import settings
+from bot.database.session import engine, init_db
+from bot.create_bot import bot, dp, event_logger
 from .handlers import router
 from .referrals import router as referrals_router
-from bot.admin import admin_router
-from .create_bot import bot, ADMIN_ID, dp
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    force=True
-)
 logger = logging.getLogger(__name__)
+
+
+@dp.errors()
+async def handle_update_error(event: ErrorEvent):
+    """Log unhandled update errors with the handler/action and update context."""
+    update = event.update
+    user = getattr(update, "from_user", None)
+    action = "unknown"
+    if user:
+        action = f"Telegram update from user {user.id}"
+
+    try:
+        await event_logger.log_error(
+            event.exception,
+            context="aiogram update handler",
+            action=action,
+            update_info=f"Update: {update.update_id}",
+        )
+    except Exception:
+        logger.exception("Failed to report update error to Telegram")
+
+    return True
 
 
 async def main():
     try:
-        # 1. Инициализация БД
-        logger.info("🗄️ Initializing database...")
+        logger.info("Initializing database")
         await init_db()
-        
-        # 2. Подключение роутеров
+
         dp.include_router(admin_router)
-        # Referral router must precede the legacy deep-link router. Its filter
-        # matches only /start ref_CODE, so ordinary user deep links are untouched.
+        # Referral router must precede the legacy deep-link router.
         dp.include_router(referrals_router)
         dp.include_router(router)
-        
-        # 3. Проверка и уведомление
-        me = await bot.get_me()
-        logger.info(f"🤖 Bot started as @{me.username}")
-        try:
-            await bot.send_message(ADMIN_ID, "✅ Bot started")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to notify admin: {e}")
 
-        # 4. Запуск polling
+        me = await bot.get_me()
+        logger.info("Bot started as @%s", me.username)
+        try:
+            await bot.send_message(settings.admin_id, "✅ Bot started")
+        except Exception as exc:
+            logger.warning("Failed to notify admin: %s", exc)
+
         await dp.start_polling(bot, skip_updates=True)
-        
+    except Exception as exc:
+        logger.critical("Application startup/runtime failed", exc_info=True)
+        try:
+            await event_logger.log_error(
+                exc,
+                context="bot.main",
+                action="startup or polling",
+            )
+        except Exception:
+            logger.exception("Failed to report application error to Telegram")
+        raise
     finally:
-        # Корректное завершение в ТОМ ЖЕ loop
         await bot.session.close()
         await engine.dispose()
-        logger.info("🛑 Bot stopped")
+        logger.info("Bot stopped")
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logger.info("🛑 Shutdown signal received")
+        logger.info("Shutdown signal received")
