@@ -102,11 +102,3 @@ async def handle_referral_start(message: Message, bot: Bot):
         bot_username=(await bot.me()).username,
         user_id=user.id,
     )
-
-
-@router.callback_query(F.data.regexp(r"^viewer_referral_refresh_\d+$"))
-async def viewer_referral_refresh(callback: CallbackQuery, bot: Bot):
-    """Refresh assigned referral statistics directly from the database."""
-    referral_id = int(callback.data.rsplit("_", 1)[1])
-    if await _render_viewer_referral(callback, bot, referral_id):
-        await callback.answer("🔄 Статистика обновлена или уже актуальна")
