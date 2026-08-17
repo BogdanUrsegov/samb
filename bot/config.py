@@ -15,6 +15,7 @@ class Settings:
     price_weekly_rub: int
     price_monthly_rub: int
     price_forever_rub: int
+    gramads_api_key: str
 
 
 def _required(name: str) -> str:
@@ -45,6 +46,7 @@ def load_settings() -> Settings:
         price_weekly_rub=_int("PRICE_WEEKLY_RUB", 100),
         price_monthly_rub=_int("PRICE_MONTHLY_RUB", 150),
         price_forever_rub=_int("PRICE_FOREVER_RUB", 200),
+        gramads_api_key=_required("GRAMADS_API_KEY")
     )
 
 
