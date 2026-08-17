@@ -126,7 +126,7 @@ class TelegramEventLogger:
             f"💰 <b>Покупка подписки</b>\n\n"
             f"{_format_user_info(user_id, first_name, username)}\n"
             f"План: {html_decoration.quote(plan_readable)}\n"
-            f"Сумма: {amount} ⭐️"
+            f"Сумма: {amount}"
         )
         await self._send_event(message)
 
