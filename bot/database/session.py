@@ -12,7 +12,15 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/database.db")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# SQLite permits only one writer at a time. Use WAL and a generous busy
+# timeout so short concurrent write bursts wait for the active writer instead
+# of failing immediately with "database is locked".
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    connect_args={"timeout": 30},
+)
+
 
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -21,6 +29,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA busy_timeout=30000")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
