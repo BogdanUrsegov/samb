@@ -50,7 +50,7 @@ def create_send_another_keyboard(recip_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
-                text="✏️ Отправить еще",
+                text="✍️ Отправить еще",
                 callback_data=f"{SEND_ANOTHER_CALL}{recip_id}"
             )]
         ]

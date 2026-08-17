@@ -39,7 +39,6 @@ async def main():
         await init_db()
 
         dp.include_router(admin_router)
-        # Referral router must precede the legacy deep-link router.
         dp.include_router(referrals_router)
         dp.include_router(router)
 

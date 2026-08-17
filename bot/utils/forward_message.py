@@ -10,6 +10,8 @@ from aiogram.utils.formatting import html_decoration
 
 from bot.create_bot import event_logger
 from bot.database.utils import add_message_link, increment_received_count, increment_sent_count
+from bot.keyboards import create_send_another_keyboard
+from bot.utils.send_main_mess import send_main_mess
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +137,14 @@ async def forward_message(
                 logger.debug("Could not clear cancel keyboard", exc_info=True)
 
         await message.answer(
-            "<b>✅ Сообщение отправлено!</b>\n\n<i>Нажми /start чтобы получить свою ссылку!</i>"
+            "<b>✅ Сообщение отправлено</b>\n\n<i>💬 Ожидайте ответа на него!</i>",
+            reply_markup=create_send_another_keyboard(recipient_id)
+        )
+
+        await send_main_mess(
+            send_func=message.answer,
+            bot_username=(await bot.me()).username,
+            user_id=sender.id
         )
 
     except TelegramBadRequest as exc:
