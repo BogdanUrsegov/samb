@@ -6,14 +6,14 @@ from aiogram.utils.formatting import html_decoration
 
 def referral_stats_keyboard(referral_id: int, *, admin: bool = False) -> InlineKeyboardMarkup:
     """Build the referral statistics actions for an admin or assigned viewer."""
-    buttons = [
-        [InlineKeyboardButton(text="🔄 Обновить", callback_data=(
-            f"admin_referral_refresh_{referral_id}" if admin else f"viewer_referral_refresh_{referral_id}"
-        ))]
-    ]
+
+    buttons = []
     if admin:
         buttons.append([
             InlineKeyboardButton(text="◀️ К списку", callback_data="admin_referrals")
+        ])
+        buttons.append([
+            InlineKeyboardButton(text="🔄 Обновить", callback_data=f"admin_referral_refresh_{referral_id}")
         ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

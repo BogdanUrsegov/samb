@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
-from bot.admin.filters import IsSuperAdmin
+from bot.admin.filters import IsAdmin, IsSuperAdmin
 from bot.admin.keyboards import (
     admin_back_keyboard,
     admin_manage_back_keyboard,
@@ -43,8 +43,6 @@ from bot.utils.referrals import normalize_referral_code, referral_payload
 logger = logging.getLogger(__name__)
 router = Router()
 superadmin_router = Router()
-superadmin_router.callback_query.filter(IsSuperAdmin())
-superadmin_router.message.filter(IsSuperAdmin())
 
 
 async def _notify_user(bot: Bot, user_id: int, text: str) -> None:
@@ -75,7 +73,7 @@ async def _admin_menu(callback: CallbackQuery) -> None:
     )
 
 
-@router.message(F.text == "/admin_menu")
+@router.message(F.text == "/admin_menu", IsAdmin())
 async def admin_menu(message: Message):
     admins = await get_admins()
     is_superadmin = any(
@@ -88,14 +86,14 @@ async def admin_menu(message: Message):
     )
 
 
-@router.callback_query(F.data == "admin_back")
+@router.callback_query(F.data == "admin_back", IsAdmin())
 async def admin_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await _admin_menu(callback)
     await callback.answer()
 
 
-@superadmin_router.callback_query(F.data == "admin_manage")
+@superadmin_router.callback_query(F.data == "admin_manage", IsSuperAdmin())
 async def admin_manage(callback: CallbackQuery):
     await _edit_menu(
         callback,
@@ -105,7 +103,7 @@ async def admin_manage(callback: CallbackQuery):
     await callback.answer()
 
 
-@superadmin_router.callback_query(F.data == "admin_manage_back")
+@superadmin_router.callback_query(F.data == "admin_manage_back", IsSuperAdmin())
 async def admin_manage_back(callback: CallbackQuery):
     await _edit_menu(
         callback,
@@ -124,7 +122,7 @@ async def _manage_text() -> str:
     return "\n".join(lines)
 
 
-@superadmin_router.callback_query(F.data == "admin_add")
+@superadmin_router.callback_query(F.data == "admin_add", IsSuperAdmin())
 async def admin_add_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_admin_id)
     await callback.message.edit_text(
@@ -134,7 +132,7 @@ async def admin_add_start(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@superadmin_router.message(AdminStates.waiting_for_admin_id)
+@superadmin_router.message(AdminStates.waiting_for_admin_id, IsSuperAdmin())
 async def admin_add_finish(message: Message, state: FSMContext, bot: Bot):
     try:
         user_id = int((message.text or "").strip())
@@ -158,7 +156,7 @@ async def admin_add_finish(message: Message, state: FSMContext, bot: Bot):
     await message.answer(text, reply_markup=admin_manage_keyboard())
 
 
-@superadmin_router.callback_query(F.data == "admin_remove")
+@superadmin_router.callback_query(F.data == "admin_remove", IsSuperAdmin())
 async def admin_remove_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_remove_admin_id)
     await callback.message.edit_text(
@@ -168,7 +166,7 @@ async def admin_remove_start(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@superadmin_router.message(AdminStates.waiting_for_remove_admin_id)
+@superadmin_router.message(AdminStates.waiting_for_remove_admin_id, IsSuperAdmin())
 async def admin_remove_finish(message: Message, state: FSMContext, bot: Bot):
     try:
         user_id = int((message.text or "").strip())
@@ -197,7 +195,7 @@ async def admin_remove_finish(message: Message, state: FSMContext, bot: Bot):
     await message.answer(text, reply_markup=admin_manage_keyboard())
 
 
-@router.callback_query(F.data == "admin_stats")
+@router.callback_query(F.data == "admin_stats", IsAdmin())
 async def admin_stats(callback: CallbackQuery):
     try:
         total = await count_all_users()
@@ -219,7 +217,7 @@ async def admin_stats(callback: CallbackQuery):
         await callback.answer("❌ Ошибка при получении статистики", show_alert=True)
 
 
-@router.callback_query(F.data == "admin_users_list")
+@router.callback_query(F.data == "admin_users_list", IsAdmin())
 async def admin_users_list(callback: CallbackQuery, bot: Bot):
     try:
         user_ids = await get_all_user_ids()
@@ -239,7 +237,7 @@ async def admin_users_list(callback: CallbackQuery, bot: Bot):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.callback_query(F.data == "admin_user_info")
+@router.callback_query(F.data == "admin_user_info", IsAdmin())
 async def admin_user_info(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_user_id)
     await callback.message.edit_text(
@@ -249,7 +247,7 @@ async def admin_user_info(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data == "admin_add_vip")
+@router.callback_query(F.data == "admin_add_vip", IsAdmin())
 async def admin_add_vip(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_vip_user)
     await callback.message.edit_text(
@@ -259,7 +257,7 @@ async def admin_add_vip(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data == "admin_remove_vip")
+@router.callback_query(F.data == "admin_remove_vip", IsAdmin())
 async def admin_remove_vip(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_remove_vip_user)
     await callback.message.edit_text(
@@ -269,7 +267,7 @@ async def admin_remove_vip(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data == "admin_delete_user")
+@router.callback_query(F.data == "admin_delete_user", IsAdmin())
 async def admin_delete_user(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_delete_user)
     await callback.message.edit_text(
@@ -279,7 +277,7 @@ async def admin_delete_user(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("admin_vip_"))
+@router.callback_query(F.data.startswith("admin_vip_"), IsAdmin())
 async def admin_set_vip(callback: CallbackQuery, bot: Bot):
     try:
         _, _, plan, user_id = callback.data.split("_")
@@ -296,7 +294,7 @@ async def admin_set_vip(callback: CallbackQuery, bot: Bot):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("admin_add_vip_user_"))
+@router.callback_query(F.data.startswith("admin_add_vip_user_"), IsAdmin())
 async def admin_add_vip_user(callback: CallbackQuery):
     try:
         user_id = int(callback.data.split("_")[-1])
@@ -310,7 +308,7 @@ async def admin_add_vip_user(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("admin_remove_vip_user_"))
+@router.callback_query(F.data.startswith("admin_remove_vip_user_"), IsAdmin())
 async def admin_remove_vip_user(callback: CallbackQuery):
     try:
         user_id = int(callback.data.split("_")[-1])
@@ -325,7 +323,7 @@ async def admin_remove_vip_user(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("admin_confirm_delete_"))
+@router.callback_query(F.data.startswith("admin_confirm_delete_"), IsAdmin())
 async def admin_confirm_delete(callback: CallbackQuery):
     try:
         user_id = int(callback.data.split("_")[-1])
@@ -340,7 +338,7 @@ async def admin_confirm_delete(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.callback_query(F.data == "admin_referrals")
+@router.callback_query(F.data == "admin_referrals", IsAdmin())
 async def admin_referrals(callback: CallbackQuery):
     try:
         referrals = await get_all_referral_links()
@@ -373,7 +371,7 @@ async def _render_admin_referral(callback: CallbackQuery, bot: Bot, referral_id:
     return True
 
 
-@router.callback_query(F.data == "admin_create_referral")
+@router.callback_query(F.data == "admin_create_referral", IsAdmin())
 async def admin_create_referral(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.waiting_for_referral_name)
     await callback.message.edit_text(
@@ -383,7 +381,7 @@ async def admin_create_referral(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.message(AdminStates.waiting_for_referral_name)
+@router.message(AdminStates.waiting_for_referral_name, IsAdmin())
 async def process_referral_name(message: Message, state: FSMContext):
     name = (message.text or "").strip()
     if not name or len(name) > 100:
@@ -398,7 +396,7 @@ async def process_referral_name(message: Message, state: FSMContext):
     )
 
 
-@router.message(AdminStates.waiting_for_referral_code)
+@router.message(AdminStates.waiting_for_referral_code, IsAdmin())
 async def process_referral_code(message: Message, state: FSMContext):
     code = normalize_referral_code(message.text or "")
     if not code:
@@ -415,7 +413,7 @@ async def process_referral_code(message: Message, state: FSMContext):
     )
 
 
-@router.message(AdminStates.waiting_for_referral_price)
+@router.message(AdminStates.waiting_for_referral_price, IsAdmin())
 async def process_referral_price(message: Message, state: FSMContext):
     value = (message.text or "").strip()
     if value == "-":
@@ -437,7 +435,7 @@ async def process_referral_price(message: Message, state: FSMContext):
     )
 
 
-@router.message(AdminStates.waiting_for_referral_viewer)
+@router.message(AdminStates.waiting_for_referral_viewer, IsAdmin())
 async def process_referral_viewer(message: Message, state: FSMContext, bot: Bot):
     value = (message.text or "").strip()
     if value == "-":
@@ -478,21 +476,21 @@ async def process_referral_viewer(message: Message, state: FSMContext, bot: Bot)
         await state.clear()
 
 
-@router.callback_query(F.data.regexp(r"^admin_referral_\d+$"))
+@router.callback_query(F.data.regexp(r"^admin_referral_\d+$"), IsAdmin())
 async def admin_referral_details(callback: CallbackQuery, bot: Bot):
     referral_id = int(callback.data.rsplit("_", 1)[1])
     await _render_admin_referral(callback, bot, referral_id)
     await callback.answer()
 
 
-@router.callback_query(F.data.regexp(r"^admin_referral_refresh_\d+$"))
+@router.callback_query(F.data.regexp(r"^admin_referral_refresh_\d+$"), IsAdmin())
 async def admin_referral_refresh(callback: CallbackQuery, bot: Bot):
     referral_id = int(callback.data.rsplit("_", 1)[1])
     if await _render_admin_referral(callback, bot, referral_id):
         await callback.answer("🔄 Статистика обновлена или уже актуальна")
 
 
-@router.callback_query(F.data == "admin_growth_chart")
+@router.callback_query(F.data == "admin_growth_chart", IsAdmin())
 async def admin_growth_chart(callback: CallbackQuery, bot: Bot):
     try:
         await callback.answer("📊 Генерирую график...")
@@ -510,7 +508,7 @@ async def admin_growth_chart(callback: CallbackQuery, bot: Bot):
         await callback.answer("❌ Ошибка при генерации графика", show_alert=True)
 
 
-@router.callback_query(F.data == "admin_messages_chart")
+@router.callback_query(F.data == "admin_messages_chart", IsAdmin())
 async def admin_messages_chart(callback: CallbackQuery, bot: Bot):
     try:
         await callback.answer("📈 Генерирую график...")
@@ -524,7 +522,7 @@ async def admin_messages_chart(callback: CallbackQuery, bot: Bot):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
-@router.message(AdminStates.waiting_for_user_id)
+@router.message(AdminStates.waiting_for_user_id, IsAdmin())
 async def process_user_id(message: Message, state: FSMContext):
     if not message.text or not message.text.isdigit():
         await message.reply("❌ Введите корректный ID", reply_markup=admin_back_keyboard())
@@ -547,7 +545,7 @@ async def process_user_id(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.message(AdminStates.waiting_for_vip_user)
+@router.message(AdminStates.waiting_for_vip_user, IsAdmin())
 async def process_vip_user(message: Message, state: FSMContext):
     if not message.text or not message.text.isdigit():
         await message.reply("❌ Введите ID пользователя", reply_markup=admin_back_keyboard())
@@ -560,7 +558,7 @@ async def process_vip_user(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.message(AdminStates.waiting_for_remove_vip_user)
+@router.message(AdminStates.waiting_for_remove_vip_user, IsAdmin())
 async def process_remove_vip(message: Message, state: FSMContext):
     if not message.text or not message.text.isdigit():
         await message.reply("❌ Введите ID", reply_markup=admin_back_keyboard())
@@ -571,7 +569,7 @@ async def process_remove_vip(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.message(AdminStates.waiting_for_delete_user)
+@router.message(AdminStates.waiting_for_delete_user, IsAdmin())
 async def process_delete_user(message: Message, state: FSMContext):
     if not message.text or not message.text.isdigit():
         await message.reply("❌ Введите ID", reply_markup=admin_back_keyboard())

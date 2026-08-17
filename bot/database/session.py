@@ -1,59 +1,51 @@
-# bot/database/session.py
-import os
-from sqlalchemy import event
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Base
-from .admins import ensure_superadmin
 import logging
+
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from bot.config import settings
+from .admins import ensure_superadmin
+from .models import Base
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/database.db")
-
-# SQLite permits only one writer at a time. Use WAL and a generous busy
-# timeout so short concurrent write bursts wait for the active writer instead
-# of failing immediately with "database is locked".
+# SQLite has a single writer. WAL allows readers to continue while a write is
+# in progress; busy_timeout makes short write bursts wait instead of failing.
 engine = create_async_engine(
-    DATABASE_URL,
+    settings.database_url,
     echo=False,
     connect_args={"timeout": 30},
 )
 
 
 @event.listens_for(engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=30000")
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 async def init_db() -> None:
-    """Создаёт таблицы и настраивает PRAGMA."""
+    """Create missing tables and initialize SQLite settings."""
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("PRAGMA journal_mode=WAL;"))
-            await conn.execute(text("PRAGMA busy_timeout=30000;"))
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA busy_timeout=30000"))
             await conn.run_sync(Base.metadata.create_all)
 
-        # все проверки админки выполняются через таблицу admins.
-        admin_id = os.getenv("ADMIN_ID")
-        if admin_id:
-            try:
-                await ensure_superadmin(int(admin_id))
-            except ValueError:
-                logger.error("ADMIN_ID должен быть числом: %r", admin_id)
-                raise
-        else:
-            logger.warning("ADMIN_ID не задан — главный администратор не был создан")
-
-        logger.info("Инициализация БД завершена успешно")
-    except Exception as e:
-        logger.exception(f"Ошибка при инициализации БД: {e}")
+        await ensure_superadmin(settings.admin_id)
+        logger.info("Database initialized successfully")
+    except Exception:
+        logger.exception("Database initialization failed")
         raise

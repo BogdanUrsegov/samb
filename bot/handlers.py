@@ -56,9 +56,9 @@ PLAN_PERIODS_GEN = {"weekly": "неделю", "monthly": "месяц", "forever"
 
 # Текст для анонимного сообщения (используется в двух местах)
 ANON_MESSAGE_TEXT = (
-    "<i>🤫 Отлично! Теперь можешь отправить свое анонимное послание\n\n"
-    "📝 Поддерживаются:\n• Текст\n• Фото\n• Видео\n• Кружки\n• Голосовые\n\n"
-    "🚀 Всё полетит анонимно!</i>"
+    "🚀 Здесь можно отправить <b>анонимное сообщение</b> человеку, который опубликовал эту ссылку\n\n"
+    "<i>📝 Поддерживаются:\n• Текст\n• Фото\n• Видео\n• Кружки\n• Голосовые\n\n"
+    "🤫 Всё полетит анонимно!</i>"
 )
 
 
@@ -226,7 +226,7 @@ async def handle_action_reply(callback: CallbackQuery, state: FSMContext, bot: B
     except (IndexError, ValueError):
         return await callback.message.answer("❌ Ошибка: не удалось определить получателя.")
     
-    text = "<b>✏️ Введите ваш ответ</b>\n\nОтправьте сообщение, и я анонимно перешлю его пользователю"
+    text = "<b>✏️ Введите ваш ответ</b>\n\nОтправьте сообщение и я анонимно перешлю его пользователю"
     logger.info(f"User {callback.from_user.id} is replying to user {recip_id}")
     await _set_anonymous_state(callback, state, recip_id, text, AnonymousMessaging.waiting_for_reply)
 
