@@ -37,7 +37,7 @@ def create_reveal_reply_keyboard(
     if show_who_sent:
         buttons.append([
             InlineKeyboardButton(
-                text="🔍 Кто написал?",
+                text="👁 Кто это?",
                 callback_data=f"{WHO_SENT_CALL}{recip_id}"
             )
         ])
