@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from .models import User, Message, Subscription, ReferralLink, ReferralClick
 
 from sqlalchemy import (
-    select, update, delete, func, text, and_, or_
+    select, update, delete, func, text, and_, or_, exists
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -25,39 +25,39 @@ async def add_user_if_not_exists(
     last_name: Optional[str] = None,
 ) -> bool:
     """Добавляет/обновляет пользователя. Возвращает True если новый."""
-    is_new_user = False
     try:
         async with async_session() as session:
             async with session.begin():
-                result = await session.execute(select(User).where(User.user_id == user_id))
-                existing = result.scalar_one_or_none()
-
-                if existing is None:
-                    stmt = (
-                        sqlite_insert(User)
-                        .values(
-                            user_id=user_id,
-                            username=username,
-                            first_name=first_name,
-                            last_name=last_name,
-                        )
-                        .prefix_with("OR IGNORE")
+                stmt = (
+                    sqlite_insert(User)
+                    .values(
+                        user_id=user_id,
+                        username=username,
+                        first_name=first_name,
+                        last_name=last_name,
                     )
-                    insert_result = await session.execute(stmt)
+                    .on_conflict_do_nothing(index_elements=[User.user_id])
+                )
+                result = await session.execute(stmt)
 
-                    if insert_result.rowcount == 1:
-                        is_new_user = True
-                        logger.info(
-                            f"Добавлен новый пользователь {user_id} (@{username}, {first_name})"
-                        )
-                else:
-                    existing.username = username or existing.username
-                    existing.first_name = first_name or existing.first_name
-                    existing.last_name = last_name or existing.last_name
-                    existing.last_activity = datetime.utcnow()
-                    logger.debug(f"Обновлён пользователь {user_id}")
+                if result.rowcount == 1:
+                    logger.info(
+                        f"Добавлен новый пользователь {user_id} (@{username}, {first_name})"
+                    )
+                    return True
 
-        return is_new_user
+                await session.execute(
+                    update(User)
+                    .where(User.user_id == user_id)
+                    .values(
+                        username=username or User.username,
+                        first_name=first_name or User.first_name,
+                        last_name=last_name or User.last_name,
+                        last_activity=datetime.utcnow(),
+                    )
+                )
+                logger.debug(f"Обновлён пользователь {user_id}")
+                return False
     except Exception as e:
         logger.exception(f"Ошибка при добавлении/обновлении пользователя {user_id}: {e}")
         raise
@@ -98,7 +98,7 @@ async def increment_link_clicks(user_id: int) -> None:
             async with session.begin():
                 await session.execute(
                     update(User).where(User.user_id == user_id)
-                    .values(link_clicks=User.link_clicks + 1)
+                    .values(link_clicks=func.coalesce(User.link_clicks, 0) + 1)
                 )
                 result = await session.execute(
                     select(User.first_name, User.username, User.custom_start_param)
@@ -127,10 +127,8 @@ async def get_user_id_by_custom_start_param(custom_param: str) -> Optional[int]:
 async def check_custom_start_param_exists(custom_param: str) -> bool:
     try:
         async with async_session() as session:
-            result = await session.execute(
-                select(text("1")).where(User.custom_start_param == custom_param).limit(1)
-            )
-            return result.first() is not None
+            stmt = select(exists().where(User.custom_start_param == custom_param))
+            return bool((await session.execute(stmt)).scalar())
     except Exception as e:
         logger.exception(f"Ошибка проверки параметра '{custom_param}': {e}")
         raise
@@ -200,7 +198,7 @@ async def increment_received_count(user_id: int) -> None:
             async with session.begin():
                 await session.execute(
                     update(User).where(User.user_id == user_id)
-                    .values(messages_received=User.messages_received + 1)
+                    .values(messages_received=func.coalesce(User.messages_received, 0) + 1)
                 )
                 logger.debug(f"Увеличен счётчик полученных сообщений для user {user_id}")
     except Exception as e:
@@ -214,7 +212,7 @@ async def increment_sent_count(user_id: int) -> None:
             async with session.begin():
                 await session.execute(
                     update(User).where(User.user_id == user_id)
-                    .values(messages_sent=User.messages_sent + 1)
+                    .values(messages_sent=func.coalesce(User.messages_sent, 0) + 1)
                 )
                 logger.debug(f"Увеличен счётчик отправленных сообщений для user {user_id}")
     except Exception as e:
@@ -452,18 +450,23 @@ async def record_referral_click(referral_id: int, user_id: int) -> bool:
     try:
         async with async_session() as session:
             async with session.begin():
-                exists = await session.execute(
-                    select(text("1")).where(
-                        and_(ReferralClick.referral_id == referral_id, ReferralClick.user_id == user_id)
-                    ).limit(1)
+                user_exists = await session.execute(
+                    select(exists().where(User.user_id == user_id))
                 )
-                if exists.first():
-                    return True
-
-                user = await session.execute(select(User).where(User.user_id == user_id))
-                if not user.scalar_one_or_none():
+                if not user_exists.scalar():
                     logger.error(f"Пользователь {user_id} не найден")
                     return False
+
+                click_exists = await session.execute(
+                    select(exists().where(
+                        and_(
+                            ReferralClick.referral_id == referral_id,
+                            ReferralClick.user_id == user_id,
+                        )
+                    ))
+                )
+                if click_exists.scalar():
+                    return True
 
                 session.add(ReferralClick(referral_id=referral_id, user_id=user_id))
                 logger.info(f"Записан клик: user {user_id}, ref {referral_id}")
@@ -535,11 +538,11 @@ async def check_referral_code_exists(code: str) -> bool:
     try:
         async with async_session() as session:
             result = await session.execute(
-                select(text("1")).where(
+                select(exists().where(
                     and_(ReferralLink.code == code, ReferralLink.is_active == True)
-                ).limit(1)
+                ))
             )
-            return result.first() is not None
+            return bool(result.scalar())
     except Exception as e:
         logger.exception(f"Ошибка check_referral_code_exists: {e}")
         return True
@@ -549,11 +552,11 @@ async def check_referral_name_exists(name: str) -> bool:
     try:
         async with async_session() as session:
             result = await session.execute(
-                select(text("1")).where(
+                select(exists().where(
                     and_(ReferralLink.name == name, ReferralLink.is_active == True)
-                ).limit(1)
+                ))
             )
-            return result.first() is not None
+            return bool(result.scalar())
     except Exception as e:
         logger.exception(f"Ошибка check_referral_name_exists: {e}")
         return True
@@ -579,7 +582,7 @@ async def delete_referral_link(referral_id: int) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка delete_referral_link {referral_id}: {e}")
         return False
-    
+
 
 async def db_error():
     async with async_session() as session:
