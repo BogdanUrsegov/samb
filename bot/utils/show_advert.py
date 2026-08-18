@@ -1,10 +1,11 @@
 import logging
+import os
 import aiohttp
 from bot.config import settings
 
 logger = logging.getLogger(__name__)
 
-GRAMADS_API_KEY = settings.gramads_api_key
+GRAMADS_API_KEY = os.getenv("GRAMADS_API_KEY")
 
 
 async def show_advert(user_id):
