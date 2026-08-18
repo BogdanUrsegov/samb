@@ -9,8 +9,6 @@ from .models import Base
 
 logger = logging.getLogger(__name__)
 
-# SQLite has a single writer. WAL allows readers to continue while a write is
-# in progress; busy_timeout makes short write bursts wait instead of failing.
 engine = create_async_engine(
     settings.database_url,
     echo=False,
@@ -22,7 +20,6 @@ engine = create_async_engine(
 def set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
     cursor = dbapi_connection.cursor()
     try:
-        cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=30000")
         cursor.execute("PRAGMA foreign_keys=ON")
     finally:
