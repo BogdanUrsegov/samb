@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -16,8 +17,8 @@ engine = create_async_engine(
     connect_args={"timeout": 30},
 )
 
-# SQLite allows only one writer at a time. Serialize writes inside this process
-# so concurrent Telegram updates do not fight for the SQLite write lock.
+# SQLite allows only one writer at a time. Serialize transactions that can
+# write to the database inside this process.
 sqlite_write_lock = asyncio.Lock()
 
 
@@ -31,9 +32,17 @@ def set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
         cursor.close()
 
 
+class SQLiteAsyncSession(AsyncSession):
+    @asynccontextmanager
+    async def begin(self):
+        async with sqlite_write_lock:
+            async with super().begin():
+                yield self
+
+
 async_session = async_sessionmaker(
     engine,
-    class_=AsyncSession,
+    class_=SQLiteAsyncSession,
     expire_on_commit=False,
 )
 
