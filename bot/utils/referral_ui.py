@@ -15,6 +15,9 @@ def referral_stats_keyboard(referral_id: int, *, admin: bool = False) -> InlineK
         buttons.append([
             InlineKeyboardButton(text="🔄 Обновить", callback_data=f"admin_referral_refresh_{referral_id}")
         ])
+        buttons.append([
+            InlineKeyboardButton(text="🗑️ Удалить ссылку", callback_data=f"admin_ref_del_{referral_id}")
+        ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
