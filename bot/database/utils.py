@@ -12,7 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from .session import async_session, sqlite_write_lock
+from .session import async_session
 
 logger = logging.getLogger(__name__)
 
@@ -25,31 +25,39 @@ async def add_user_if_not_exists(
     last_name: Optional[str] = None,
 ) -> bool:
     """Добавляет/обновляет пользователя. Возвращает True если новый."""
+    is_new_user = False
     try:
-        async with sqlite_write_lock:
-            async with async_session() as session:
-                async with session.begin():
-                    stmt = sqlite_insert(User).values(
-                        user_id=user_id,
-                        username=username,
-                        first_name=first_name,
-                        last_name=last_name,
-                    ).prefix_with("OR IGNORE")
-                    result = await session.execute(stmt)
+        async with async_session() as session:
+            async with session.begin():
+                result = await session.execute(select(User).where(User.user_id == user_id))
+                existing = result.scalar_one_or_none()
 
-                    if result.rowcount == 1:
-                        logger.info(f"Добавлен новый пользователь {user_id} (@{username}, {first_name})")
-                        return True
+                if existing is None:
+                    stmt = (
+                        sqlite_insert(User)
+                        .values(
+                            user_id=user_id,
+                            username=username,
+                            first_name=first_name,
+                            last_name=last_name,
+                        )
+                        .prefix_with("OR IGNORE")
+                    )
+                    insert_result = await session.execute(stmt)
 
-                    existing = await session.get(User, user_id)
-                    if existing:
-                        existing.username = username or existing.username
-                        existing.first_name = first_name or existing.first_name
-                        existing.last_name = last_name or existing.last_name
-                        existing.last_activity = datetime.utcnow()
-                        logger.debug(f"Обновлён пользователь {user_id}")
+                    if insert_result.rowcount == 1:
+                        is_new_user = True
+                        logger.info(
+                            f"Добавлен новый пользователь {user_id} (@{username}, {first_name})"
+                        )
+                else:
+                    existing.username = username or existing.username
+                    existing.first_name = first_name or existing.first_name
+                    existing.last_name = last_name or existing.last_name
+                    existing.last_activity = datetime.utcnow()
+                    logger.debug(f"Обновлён пользователь {user_id}")
 
-                    return False
+        return is_new_user
     except Exception as e:
         logger.exception(f"Ошибка при добавлении/обновлении пользователя {user_id}: {e}")
         raise
@@ -139,7 +147,7 @@ async def set_custom_start_param(user_id: int, custom_param: str) -> None:
                 result = await session.execute(select(User).where(User.user_id == user_id))
                 user = result.scalar_one_or_none()
                 if user:
-                    logger.info(f"Установлен кастомный параметр '{custom_param}' для {user_id}")
+                    logger.info(f"Установлен кастомный параметр '{custom_param}' для user {user_id}")
     except Exception as e:
         logger.exception(f"Ошибка установки параметра '{custom_param}' для {user_id}: {e}")
         raise
@@ -571,7 +579,7 @@ async def delete_referral_link(referral_id: int) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка delete_referral_link {referral_id}: {e}")
         return False
-
+    
 
 async def db_error():
     async with async_session() as session:
