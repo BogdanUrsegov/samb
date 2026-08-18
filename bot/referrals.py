@@ -53,6 +53,14 @@ async def _render_viewer_referral(callback: CallbackQuery, bot: Bot, referral_id
 async def handle_referral_start(message: Message, bot: Bot):
     """Track /start ref_CODE and show stats to the assigned viewer."""
     user = message.from_user
+
+    is_new_user = await add_user_if_not_exists(
+        user.id,
+        user.first_name or "Пользователь",
+        user.username,
+        user.last_name,
+    )
+    
     parts = (message.text or "").split(maxsplit=1)
     payload = parts[1] if len(parts) == 2 else ""
     code = referral_code_from_payload(payload)
@@ -72,12 +80,7 @@ async def handle_referral_start(message: Message, bot: Bot):
 
     # A referral click is counted only for a genuinely new bot user.
     # Existing users must not become referral conversions merely by opening the link.
-    is_new_user = await add_user_if_not_exists(
-        user.id,
-        user.first_name or "Пользователь",
-        user.username,
-        user.last_name,
-    )
+
     if is_new_user:
         await record_referral_click(referral["id"], user.id)
         logger.info("New referral click processed: user=%s code=%s", user.id, code)

@@ -102,7 +102,7 @@ async def handle_start_deep_link(message: Message, state: FSMContext, bot: Bot):
 
     # 4. Финальная проверка (если ID равен 0 или None)
     if not recip_id:
-        return await message.answer("🔗 <i>Упс! Эта ссылка недействительна. Попроси у пользователя свежую.</i>")
+        return await message.answer("🔗 <b>Упс! Эта ссылка недействительна</b>\n\n<i>Попроси у пользователя свежую</i>")
     
     if recip_id == user.id:
         logger.info(f"User {user.id} tried to send message to themselves.")
@@ -113,11 +113,13 @@ async def handle_start_deep_link(message: Message, state: FSMContext, bot: Bot):
 
     try:
         await state.set_state(AnonymousMessaging.waiting_for_message)
+        await state.update_data(recip_id=recip_id)
         mess = await message.answer(
             ANON_MESSAGE_TEXT, parse_mode=ParseMode.HTML, disable_web_page_preview=True,
             reply_markup=create_cancel_keyboard()
         )
-        await state.update_data(recip_id=recip_id, mess_id=mess.message_id)
+        await state.update_data(mess_id=mess.message_id)
+
         await increment_link_clicks(recip_id)
         await event_logger.log_link_click(
             user_id=user.id,
