@@ -13,7 +13,7 @@ async def show_advert(user_id):
             async with session.post(
                 "https://api.gramads.net/ad/SendPost",
                 headers={
-                    f"Authorization": "Bearer {GRAMADS_API_KEY}",
+                    "Authorization": f"Bearer {GRAMADS_API_KEY}",
                     "Content-Type": "application/json",
                 },
                 json={"SendToChatId": user_id},
