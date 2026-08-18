@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from sqlalchemy import event, text
@@ -14,6 +15,10 @@ engine = create_async_engine(
     echo=False,
     connect_args={"timeout": 30},
 )
+
+# SQLite allows only one writer at a time. Serialize writes inside this process
+# so concurrent Telegram updates do not fight for the SQLite write lock.
+sqlite_write_lock = asyncio.Lock()
 
 
 @event.listens_for(engine.sync_engine, "connect")
