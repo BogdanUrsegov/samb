@@ -10,13 +10,13 @@ from .models import User, Message, Subscription, ReferralLink, ReferralClick
 from sqlalchemy import (
     select, update, delete, func, text, and_, or_
 )
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from .session import async_session
+from .session import async_session, sqlite_write_lock
 
 logger = logging.getLogger(__name__)
 
 # ─── Users ───────────────────────────────────────────────────────────────────
-
 async def add_user_if_not_exists(
     user_id: int,
     first_name: str,
@@ -24,33 +24,34 @@ async def add_user_if_not_exists(
     last_name: Optional[str] = None,
 ) -> bool:
     """Добавляет/обновляет пользователя. Возвращает True если новый."""
-    is_new_user = False
     try:
-        async with async_session() as session:
-            async with session.begin():
-                result = await session.execute(select(User).where(User.user_id == user_id))
-                existing = result.scalar_one_or_none()
+        async with sqlite_write_lock:
+            async with async_session() as session:
+                async with session.begin():
+                    stmt = sqlite_insert(User).values(
+                        user_id=user_id,
+                        username=username,
+                        first_name=first_name,
+                        last_name=last_name,
+                    ).prefix_with("OR IGNORE")
+                    result = await session.execute(stmt)
 
-                if existing is None:
-                    new_user = User(
-                        user_id=user_id, username=username,
-                        first_name=first_name, last_name=last_name
-                    )
-                    session.add(new_user)
-                    is_new_user = True
-                    logger.info(f"Добавлен новый пользователь {user_id} (@{username}, {first_name})")
-                else:
-                    existing.username = username or existing.username
-                    existing.first_name = first_name or existing.first_name
-                    existing.last_name = last_name or existing.last_name
-                    existing.last_activity = datetime.utcnow()
-                    logger.debug(f"Обновлён пользователь {user_id}")
+                    if result.rowcount == 1:
+                        logger.info(f"Добавлен новый пользователь {user_id} (@{username}, {first_name})")
+                        return True
 
-        return is_new_user
+                    existing = await session.get(User, user_id)
+                    if existing:
+                        existing.username = username or existing.username
+                        existing.first_name = first_name or existing.first_name
+                        existing.last_name = last_name or existing.last_name
+                        existing.last_activity = datetime.utcnow()
+                        logger.debug(f"Обновлён пользователь {user_id}")
+
+                    return False
     except Exception as e:
         logger.exception(f"Ошибка при добавлении/обновлении пользователя {user_id}: {e}")
         raise
-
 
 async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
     try:
@@ -63,7 +64,6 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.exception(f"Ошибка при получении пользователя {user_id}: {e}")
         raise
-
 
 async def get_user_stats(user_id: int) -> Optional[Dict[str, Any]]:
     try:
@@ -79,7 +79,6 @@ async def get_user_stats(user_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.exception(f"Ошибка при получении статистики {user_id}: {e}")
         raise
-
 
 async def increment_link_clicks(user_id: int) -> None:
     try:
@@ -100,7 +99,6 @@ async def increment_link_clicks(user_id: int) -> None:
         logger.exception(f"Ошибка increment_link_clicks {user_id}: {e}")
         raise
 
-
 async def get_user_id_by_custom_start_param(custom_param: str) -> Optional[int]:
     try:
         async with async_session() as session:
@@ -112,7 +110,6 @@ async def get_user_id_by_custom_start_param(custom_param: str) -> Optional[int]:
         logger.exception(f"Ошибка поиска по параметру '{custom_param}': {e}")
         raise
 
-
 async def check_custom_start_param_exists(custom_param: str) -> bool:
     try:
         async with async_session() as session:
@@ -123,7 +120,6 @@ async def check_custom_start_param_exists(custom_param: str) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка проверки параметра '{custom_param}': {e}")
         raise
-
 
 async def set_custom_start_param(user_id: int, custom_param: str) -> None:
     try:
@@ -141,9 +137,7 @@ async def set_custom_start_param(user_id: int, custom_param: str) -> None:
         logger.exception(f"Ошибка установки параметра '{custom_param}' для {user_id}: {e}")
         raise
 
-
 # ─── Messages ────────────────────────────────────────────────────────────────
-
 async def add_message_link(
     recipient_id: int, received_message_id: int,
     sender_id: int, sender_message_id: int,
@@ -161,7 +155,6 @@ async def add_message_link(
     except Exception as e:
         logger.exception(f"Ошибка добавления связи сообщений: {e}")
         raise
-
 
 async def get_sender_info_by_message(
     recipient_id: int, received_message_id: int
@@ -182,7 +175,6 @@ async def get_sender_info_by_message(
         logger.exception(f"Ошибка get_sender_info_by_message: {e}")
         raise
 
-
 async def increment_received_count(user_id: int) -> None:
     try:
         async with async_session() as session:
@@ -195,7 +187,6 @@ async def increment_received_count(user_id: int) -> None:
     except Exception as e:
         logger.exception(f"Ошибка increment_received_count {user_id}: {e}")
         raise
-
 
 async def increment_sent_count(user_id: int) -> None:
     try:
@@ -210,9 +201,7 @@ async def increment_sent_count(user_id: int) -> None:
         logger.exception(f"Ошибка increment_sent_count {user_id}: {e}")
         raise
 
-
 # ─── Subscriptions ───────────────────────────────────────────────────────────
-
 async def get_subscription(user_id: int) -> Optional[Dict[str, Any]]:
     try:
         async with async_session() as session:
@@ -222,9 +211,7 @@ async def get_subscription(user_id: int) -> Optional[Dict[str, Any]]:
             sub = result.scalar_one_or_none()
             if not sub:
                 return None
-
             data = {c.name: getattr(sub, c.name) for c in sub.__table__.columns}
-
             if data["plan"] != "forever" and data["expiry_date"]:
                 if data["expiry_date"] < datetime.now():
                     data["is_active"] = False
@@ -235,7 +222,6 @@ async def get_subscription(user_id: int) -> Optional[Dict[str, Any]]:
         logger.exception(f"Ошибка get_subscription {user_id}: {e}")
         raise
 
-
 async def add_or_update_subscription(user_id: int, plan: str) -> None:
     try:
         start_date = datetime.now()
@@ -244,14 +230,12 @@ async def add_or_update_subscription(user_id: int, plan: str) -> None:
             expiry_date = start_date + timedelta(days=7)
         elif plan == "monthly":
             expiry_date = start_date + timedelta(days=30)
-
         async with async_session() as session:
             async with session.begin():
                 result = await session.execute(
                     select(Subscription).where(Subscription.user_id == user_id)
                 )
                 existing = result.scalar_one_or_none()
-
                 if existing:
                     existing.is_active = True
                     existing.plan = plan
@@ -268,7 +252,6 @@ async def add_or_update_subscription(user_id: int, plan: str) -> None:
         logger.exception(f"Ошибка add_or_update_subscription {user_id}: {e}")
         raise
 
-
 async def remove_subscription(user_id: int) -> bool:
     try:
         async with async_session() as session:
@@ -282,7 +265,6 @@ async def remove_subscription(user_id: int) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка remove_subscription {user_id}: {e}")
         raise
-
 
 async def get_subscription_plans() -> Dict[str, int]:
     try:
@@ -306,20 +288,16 @@ async def get_subscription_plans() -> Dict[str, int]:
         logger.exception(f"Ошибка get_subscription_plans: {e}")
         raise
 
-
 # ─── Stats ───────────────────────────────────────────────────────────────────
-
 async def get_all_user_ids() -> list[int]:
     async with async_session() as session:
         result = await session.execute(select(User.user_id).order_by(User.user_id))
         return [row[0] for row in result.all()]
 
-
 async def count_all_users() -> int:
     async with async_session() as session:
         result = await session.execute(select(func.count()).select_from(User))
         return result.scalar() or 0
-
 
 async def get_user_growth_data(days: int = 7) -> Dict[str, int]:
     try:
@@ -330,7 +308,6 @@ async def get_user_growth_data(days: int = 7) -> Dict[str, int]:
         while current <= end_date:
             result[current.strftime("%Y-%m-%d")] = 0
             current += timedelta(days=1)
-
         async with async_session() as session:
             stmt = select(
                 func.date(User.registration_date).label("date"),
@@ -346,7 +323,6 @@ async def get_user_growth_data(days: int = 7) -> Dict[str, int]:
         logger.exception(f"Ошибка get_user_growth_data: {e}")
         raise
 
-
 async def get_message_count_data(days: int = 7) -> Dict[str, int]:
     try:
         end_date = datetime.now()
@@ -356,7 +332,6 @@ async def get_message_count_data(days: int = 7) -> Dict[str, int]:
         while current <= end_date:
             result[current.strftime("%Y-%m-%d")] = 0
             current += timedelta(days=1)
-
         async with async_session() as session:
             stmt = select(
                 func.date(Message.sent_date).label("date"),
@@ -371,7 +346,6 @@ async def get_message_count_data(days: int = 7) -> Dict[str, int]:
     except Exception as e:
         logger.exception(f"Ошибка get_message_count_data: {e}")
         raise
-
 
 async def delete_user_by_id(user_id: int) -> bool:
     try:
@@ -393,9 +367,7 @@ async def delete_user_by_id(user_id: int) -> bool:
         logger.exception(f"Ошибка delete_user_by_id {user_id}: {e}")
         raise
 
-
 # ─── Referrals ───────────────────────────────────────────────────────────────
-
 async def create_referral_link(
     code: str, name: str, admin_id: int,
     price: Optional[float] = None, viewer_id: Optional[int] = None,
@@ -405,7 +377,6 @@ async def create_referral_link(
             price = None
         if isinstance(viewer_id, str):
             viewer_id = int(viewer_id) if viewer_id.strip().isdigit() and viewer_id.strip() != "-" else None
-
         async with async_session() as session:
             async with session.begin():
                 link = ReferralLink(
@@ -421,7 +392,6 @@ async def create_referral_link(
         logger.exception(f"Ошибка create_referral_link '{code}': {e}")
         raise
 
-
 async def get_referral_by_code(code: str) -> Optional[Dict[str, Any]]:
     try:
         async with async_session() as session:
@@ -436,7 +406,6 @@ async def get_referral_by_code(code: str) -> Optional[Dict[str, Any]]:
         logger.exception(f"Ошибка get_referral_by_code '{code}': {e}")
         raise
 
-
 async def record_referral_click(referral_id: int, user_id: int) -> bool:
     try:
         async with async_session() as session:
@@ -448,19 +417,16 @@ async def record_referral_click(referral_id: int, user_id: int) -> bool:
                 )
                 if exists.first():
                     return True
-
                 user = await session.execute(select(User).where(User.user_id == user_id))
                 if not user.scalar_one_or_none():
                     logger.error(f"Пользователь {user_id} не найден")
                     return False
-
                 session.add(ReferralClick(referral_id=referral_id, user_id=user_id))
                 logger.info(f"Записан клик: user {user_id}, ref {referral_id}")
                 return True
     except Exception as e:
         logger.exception(f"Ошибка record_referral_click: {e}")
         return False
-
 
 async def get_all_referral_links() -> List[Dict[str, Any]]:
     try:
@@ -482,7 +448,6 @@ async def get_all_referral_links() -> List[Dict[str, Any]]:
         logger.exception(f"Ошибка get_all_referral_links: {e}")
         raise
 
-
 async def get_referral_stats(referral_id: int) -> Dict[str, Any]:
     try:
         async with async_session() as session:
@@ -494,7 +459,6 @@ async def get_referral_stats(referral_id: int) -> Dict[str, Any]:
                 return {}
 
             data = {c.name: getattr(link, c.name) for c in link.__table__.columns}
-
             clicks_result = await session.execute(
                 select(func.count()).select_from(ReferralClick).where(ReferralClick.referral_id == referral_id)
             )
@@ -504,7 +468,6 @@ async def get_referral_stats(referral_id: int) -> Dict[str, Any]:
                 data["total_amount"] = round(data["price"] * data["total_clicks"], 2)
             else:
                 data["total_amount"] = None
-
             recent = await session.execute(
                 select(
                     ReferralClick.user_id, ReferralClick.clicked_at,
@@ -519,7 +482,6 @@ async def get_referral_stats(referral_id: int) -> Dict[str, Any]:
         logger.exception(f"Ошибка get_referral_stats {referral_id}: {e}")
         raise
 
-
 async def check_referral_code_exists(code: str) -> bool:
     try:
         async with async_session() as session:
@@ -532,7 +494,6 @@ async def check_referral_code_exists(code: str) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка check_referral_code_exists: {e}")
         return True
-
 
 async def check_referral_name_exists(name: str) -> bool:
     try:
@@ -547,14 +508,12 @@ async def check_referral_name_exists(name: str) -> bool:
         logger.exception(f"Ошибка check_referral_name_exists: {e}")
         return True
 
-
 async def check_referral_exists(code: str, name: str) -> Tuple[bool, bool]:
     try:
         return await check_referral_code_exists(code), await check_referral_name_exists(name)
     except Exception as e:
         logger.exception(f"Ошибка check_referral_exists: {e}")
         return True, True
-
 
 async def delete_referral_link(referral_id: int) -> bool:
     try:
@@ -568,7 +527,6 @@ async def delete_referral_link(referral_id: int) -> bool:
     except Exception as e:
         logger.exception(f"Ошибка delete_referral_link {referral_id}: {e}")
         return False
-    
 
 async def db_error():
     async with async_session() as session:

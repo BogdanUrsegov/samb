@@ -1,17 +1,11 @@
 services:
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     env_file:
       - .env
     environment:
-      - PYTHONUNBUFFERED=1  # 👈 Отключает буферизацию логов
-      - PYTHONPATH=/app     # 👈 Явно указываем путь
-    ports:
-      - "8009:8009"
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /app
     volumes:
       - ./data:/app/data
     restart: unless-stopped
-    command: python -m bot.main
-    user: "root"
