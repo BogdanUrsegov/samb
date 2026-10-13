@@ -325,7 +325,7 @@ async def handle_subscription_choice(query: CallbackQuery):
     user_id = query.from_user.id
     order_id = await create_initial_order(user_id, str(uuid4()))
     invoice = await asyncio.to_thread(
-        create_invoice, INITIAL_AMOUNT_RUB, order_id, "VIP на 3 дня"
+        create_invoice, INITIAL_AMOUNT_RUB, order_id, "VIP на 3 дня", f"tg_{user_id}"
     )
     if not invoice or not invoice.get("pay_url"):
         return await query.answer(
