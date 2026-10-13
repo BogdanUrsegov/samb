@@ -74,6 +74,10 @@ async def handle_rollypay_webhook(request: web.Request) -> web.Response:
             amount = round(float(payment.get("amount", 0)), 2)
         except (TypeError, ValueError):
             amount = 0
+        saved_payment_id = initial_order.get("payment_id")
+        if saved_payment_id and saved_payment_id != str(payment_id):
+            logger.error("RollyPay order %s received an unexpected payment id", order_id)
+            return web.Response(status=200, text="Unexpected payment id")
         if (
             initial_order["purpose"] == "initial"
             and amount == INITIAL_AMOUNT_RUB
