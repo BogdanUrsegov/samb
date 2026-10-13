@@ -40,6 +40,7 @@ from bot.database.billing import (
     get_or_create_recurring_key,
     get_pending_initial_order,
     get_recurring_billing,
+    mark_initial_payment_failed,
     get_user_for_provider_subscription,
     save_recurring_subscription,
     update_recurring_state,
@@ -396,6 +397,13 @@ async def handle_payment_check(query: CallbackQuery):
         if not payment:
             return await query.answer("❌ Не удалось проверить платёж", show_alert=True)
         if payment.get("status") != "paid":
+            provider_status = str(payment.get("status") or "")
+            if provider_status in {"canceled", "expired"}:
+                await mark_initial_payment_failed(order_id, str(payment_id), provider_status)
+                return await query.answer(
+                    "Счёт отменён или истёк. Нажмите «VIP на 3 дня — 17 ₽», чтобы создать новый.",
+                    show_alert=True,
+                )
             return await query.answer("⏳ Платёж ещё не оплачен", show_alert=True)
 
         try:
