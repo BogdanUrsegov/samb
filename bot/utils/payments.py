@@ -61,7 +61,12 @@ def _send_request(
     return None
 
 
-def create_invoice(\n    amount: float, order_id: str, comment: str | None = None, customer_id: str | None = None\n) -> dict[str, Any] | None:
+def create_invoice(
+    amount: float,
+    order_id: str,
+    comment: str | None = None,
+    customer_id: str | None = None,
+) -> dict[str, Any] | None:
     """Create a one-time SBP payment. Reusing order_id is safe for retries."""
     payload: dict[str, Any] = {
         "amount": f"{amount:.2f}",
