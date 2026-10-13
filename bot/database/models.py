@@ -94,3 +94,44 @@ class Admin(Base):
     added_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     added_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+
+class BillingPayment(Base):
+    """One-time 17 RUB VIP purchase and its provider-side payment reference."""
+
+    __tablename__ = "billing_payments"
+
+    order_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    payment_id: Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class RecurringBilling(Base):
+    """Provider subscription and its stable idempotency key for one Telegram user."""
+
+    __tablename__ = "recurring_billing"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), primary_key=True)
+    initial_order_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    subscription_id: Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True)
+    state: Mapped[str] = mapped_column(String(32), default="new", nullable=False)
+    billing_status: Mapped[str] = mapped_column(String(32), default="not_created", nullable=False)
+    pay_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ProcessedCharge(Base):
+    """Unique payment ledger used to prevent duplicate access extensions on webhook retries."""
+
+    __tablename__ = "processed_recurring_charges"
+
+    payment_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
