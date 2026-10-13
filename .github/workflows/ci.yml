@@ -23,5 +23,6 @@ jobs:
         env:
           BOT_TOKEN: "123456:TEST_TOKEN"
           ADMIN_ID: "1"
+          GRAMADS_API_KEY: "TEST_API_KEY"
         run: |
           python -c "import bot.referrals; import bot.admin.handlers.admin; import bot.main"

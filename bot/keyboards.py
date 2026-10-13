@@ -1,131 +1,92 @@
-from uuid import uuid4
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import os
 
-from bot.utils.payments import create_invoice
-
-# Константы для callback_data (добавлено : для единообразия)
-PRICE_WEEKLY_RUB = int(os.getenv("PRICE_WEEKLY_RUB", 50))
-PRICE_MONTHLY_RUB = int(os.getenv("PRICE_MONTHLY_RUB", 100))
-PRICE_FOREVER_RUB = int(os.getenv("PRICE_FOREVER_RUB", 200))
+INITIAL_AMOUNT_RUB = 17
 
 REPLY_TO_CALL = "reply_to:"
 WHO_SENT_CALL = "who_sent:"
 SEND_ANOTHER_CALL = "send_another:"
 CANCEL_ACTION_CALL = "cancel_action"
-SUB_WEEKLY_CALL = "sub:weekly:"
-SUB_MONTHLY_CALL = "sub:monthly:"
-SUB_FOREVER_CALL = "sub:forever:"
-SUB_CLOSE_CALL = "sub:close:"
 CHECK_PAYMENT_CALL = "check:"
+START_INITIAL_CALL = "sub:initial"
+SUB_CLOSE_CALL = "sub:close"
+RECURRING_RETRY_CALL = "recurring_retry"
+RECURRING_CHECK_CALL = "recurring_check"
+RECURRING_STOP_CALL = "recurring_stop"
 
 
 def create_reveal_reply_keyboard(
     recip_id: int, show_reply: bool = True, show_who_sent: bool = True
 ) -> InlineKeyboardMarkup:
-    """Клавиатура с кнопками 'Ответить' и 'Кто это?'."""
     buttons = []
-
     if show_reply:
-        buttons.append([
-            InlineKeyboardButton(
-                text="🗣️ Ответить",
-                callback_data=f"{REPLY_TO_CALL}{recip_id}"
-            )
-        ])
-
+        buttons.append([InlineKeyboardButton(
+            text="🗣️ Ответить", callback_data=f"{REPLY_TO_CALL}{recip_id}"
+        )])
     if show_who_sent:
-        buttons.append([
-            InlineKeyboardButton(
-                text="👁 Кто это?",
-                callback_data=f"{WHO_SENT_CALL}{recip_id}"
-            )
-        ])
-
+        buttons.append([InlineKeyboardButton(
+            text="👁 Кто это?", callback_data=f"{WHO_SENT_CALL}{recip_id}"
+        )])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def create_send_another_keyboard(recip_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура с кнопкой 'Отправить еще'."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(
-                text="✍️ Отправить еще",
-                callback_data=f"{SEND_ANOTHER_CALL}{recip_id}"
-            )]
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="✍️ Отправить еще", callback_data=f"{SEND_ANOTHER_CALL}{recip_id}"
+        )
+    ]])
 
 
 def create_cancel_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура с кнопкой отмены."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Отменить", callback_data=CANCEL_ACTION_CALL)]
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="❌ Отменить", callback_data=CANCEL_ACTION_CALL)
+    ]])
+
 
 def create_share_keyboard(user_link: str) -> InlineKeyboardMarkup:
-    """
-    Создает клавиатуру с кнопкой поделиться ссылкой.
-
-    Args:
-        user_link: Ссылка пользователя для получения анонимных сообщений
-
-    Returns:
-        InlineKeyboardMarkup: Клавиатура с кнопкой поделиться
-    """
     share_url = f"https://t.me/share/url?url={user_link}"
-    buttons = [[InlineKeyboardButton(text="📤 Поделиться ссылкой", url=share_url)]]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="📤 Поделиться ссылкой", url=share_url)
+    ]])
+
 
 def create_subscription_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора плана подписки."""
-    plans = [
-        ("🥉 Неделя", PRICE_WEEKLY_RUB, SUB_WEEKLY_CALL),
-        ("🥈 Месяц", PRICE_MONTHLY_RUB, SUB_MONTHLY_CALL),
-        ("🥇 Навсегда", PRICE_FOREVER_RUB, SUB_FOREVER_CALL),
-    ]
-    
-    buttons = [
+    return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=f"{name} - {price} ₽",
-            callback_data=callback
-        )]
-        for name, price, callback in plans
-    ]
-    
-    buttons.append([
-        InlineKeyboardButton(
-            text="❌ Закрыть",
-            callback_data=SUB_CLOSE_CALL
-        )
+            text="👑 VIP на 3 дня — 17 ₽", callback_data=START_INITIAL_CALL
+        )],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data=SUB_CLOSE_CALL)],
     ])
-    
+
+
+def create_payment_keyboard(
+    pay_url: str, payment_id: str, order_id: str
+) -> InlineKeyboardMarkup:
+    buttons = [[InlineKeyboardButton(text="💳 Оплатить 17 ₽", url=pay_url)]]
+    buttons.append([InlineKeyboardButton(
+        text="✅ Проверить оплату", callback_data=f"{CHECK_PAYMENT_CALL}{order_id}"
+    )])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def create_payment_keyboard(amount: float) -> InlineKeyboardMarkup | None:
-    """Клавиатура оплаты через RollyPay."""
 
-    order_id = str(uuid4())
-    invoice = create_invoice(amount, order_id)
-
-    if not invoice or not invoice.get("pay_url"):
-        return None
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="💳 Оплатить",
-                    url=invoice["pay_url"],
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="✅ Проверить оплату",
-                    callback_data=f"{CHECK_PAYMENT_CALL}{invoice['payment_id']}",
-                )
-            ],
-        ]
-    )
+def create_recurring_consent_keyboard(
+    pay_url: str | None,
+    has_subscription: bool = False,
+) -> InlineKeyboardMarkup:
+    buttons = []
+    if pay_url:
+        buttons.append([InlineKeyboardButton(
+            text="🔁 Подключить автопродление · 299 ₽ / 3 дня", url=pay_url
+        )])
+    buttons.append([InlineKeyboardButton(
+        text="🔎 Проверить привязку", callback_data=RECURRING_CHECK_CALL
+    )])
+    if has_subscription:
+        buttons.append([InlineKeyboardButton(
+            text="🛑 Отключить автопродление", callback_data=RECURRING_STOP_CALL
+        )])
+    else:
+        buttons.append([InlineKeyboardButton(
+            text="🔄 Повторить создание ссылки", callback_data=RECURRING_RETRY_CALL
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
