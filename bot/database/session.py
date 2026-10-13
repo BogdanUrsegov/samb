@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from sqlalchemy import event, text
@@ -34,6 +35,9 @@ async_session = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+# Serialize write transactions within this bot process; SQLite permits one writer.
+sqlite_write_lock = asyncio.Lock()
 
 
 async def init_db() -> None:
