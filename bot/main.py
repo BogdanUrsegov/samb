@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import os
+
+from aiohttp import web
 
 from aiogram.types import ErrorEvent
 
@@ -9,6 +12,7 @@ from bot.database.session import engine, init_db
 from bot.create_bot import bot, dp, event_logger
 from .handlers import router
 from .referrals import router as referrals_router
+from bot.utils.rollypay_webhook import create_webhook_app
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,7 @@ async def handle_update_error(event: ErrorEvent):
 
 
 async def main():
+    webhook_runner = None
     try:
         logger.info("Initializing database")
         await init_db()
@@ -44,6 +49,18 @@ async def main():
 
         # Start the single ordered dispatcher before any business event can be logged.
         await event_logger.start()
+
+        if os.getenv("ROLLYPAY_WEBHOOK_ENABLED", "true").lower() != "false":
+            webhook_app = create_webhook_app()
+            webhook_runner = web.AppRunner(webhook_app, access_log=None)
+            await webhook_runner.setup()
+            webhook_host = os.getenv("ROLLYPAY_WEBHOOK_HOST", "0.0.0.0")
+            webhook_port = int(os.getenv("ROLLYPAY_WEBHOOK_PORT", "8081"))
+            webhook_site = web.TCPSite(webhook_runner, webhook_host, webhook_port)
+            await webhook_site.start()
+            logger.info("RollyPay webhook listening on %s:%s", webhook_host, webhook_port)
+            if not os.getenv("ROLLYPAY_SIGNING_SECRET"):
+                logger.warning("ROLLYPAY_SIGNING_SECRET is not set; RollyPay callbacks will be rejected")
 
         me = await bot.get_me()
         logger.info("Bot started as @%s", me.username)
@@ -65,6 +82,8 @@ async def main():
             logger.exception("Failed to report application error to Telegram")
         raise
     finally:
+        if webhook_runner is not None:
+            await webhook_runner.cleanup()
         # Drain accepted Telegram log events before closing the bot session.
         await event_logger.stop()
         await bot.session.close()
