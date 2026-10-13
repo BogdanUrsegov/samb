@@ -12,6 +12,7 @@ from bot.database.billing import (
     complete_initial_payment,
     get_initial_order,
     get_user_for_provider_subscription,
+    mark_initial_payment_failed,
 )
 from bot.utils.payments import (
     INITIAL_AMOUNT_RUB,
@@ -44,6 +45,10 @@ async def handle_rollypay_webhook(request: web.Request) -> web.Response:
 
     # Ignore non-payment events, but acknowledge them so RollyPay doesn't retry forever.
     if event_type != "payment.paid":
+        if event_type in {"payment.canceled", "payment.expired"}:
+            order_id = str(event.get("order_id") or "")
+            if order_id:
+                await mark_initial_payment_failed(order_id, str(payment_id), event_type.removeprefix("payment."))
         if event_type in {"payment.refunded", "payment.chargeback"}:
             logger.error(
                 "RollyPay reported a late %s for payment %s; manual reconciliation may be required",
