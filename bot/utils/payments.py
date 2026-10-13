@@ -160,7 +160,7 @@ def get_recurring_subscription(subscription_id: str) -> dict[str, Any] | None:
 
 
 def stop_recurring_subscription(subscription_id: str) -> dict[str, Any] | None:
-    return _send_request("POST", f"subscriptions/{subscription_id}/stop", {})
+    return _send_request("POST", f"subscriptions/{subscription_id}/stop")
 
 
 def verify_webhook_signature(raw_body: bytes, timestamp: str, signature: str) -> bool:
