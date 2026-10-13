@@ -27,7 +27,7 @@ ROLLYPAY_WEBHOOK_PORT=8081
 - `ROLLYPAY_TERMINAL_ID` is the UUID of the terminal associated with the API key.
 - `ROLLYPAY_RECURRING_PLAN_ID` must be the UUID of a plan returned by `GET /api/v1/subscription-plans?terminal_id=...`.
 - The plan must charge exactly **299 RUB**. RollyPay configures plans; the bot cannot create a plan or change its interval through the subscription-create request.
-- Do **not** set `ROLLYPAY_RECURRING_PLAN_CONFIRMED=true` until RollyPay has confirmed that this exact plan charges every **3 days**. The public plan response may not expose enough detail to prove a three-day cadence; the code intentionally fails closed without this explicit confirmation.
+- Do **not** set `ROLLYPAY_RECURRING_PLAN_CONFIRMED=true` until RollyPay has confirmed all of these for this exact plan: the payer is charged exactly **299 RUB**, each cycle is **3 days**, and the first recurring charge is scheduled **no earlier than the end of the initial 3-day access period**. The public plan response may not expose enough detail to prove the full schedule; the code intentionally fails closed without this explicit confirmation. If RollyPay cannot configure the delayed first charge, this exact trial-then-renewal flow cannot safely be launched with the current plan API.
 - `ROLLYPAY_SIGNING_SECRET` is the webhook signing secret, not the API key.
 
 ## Webhook / HTTPS setup
