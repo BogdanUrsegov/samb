@@ -108,7 +108,7 @@ class BillingPayment(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     purpose: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
 class RecurringBilling(Base):
@@ -123,7 +123,7 @@ class RecurringBilling(Base):
     billing_status: Mapped[str] = mapped_column(String(32), default="not_created", nullable=False)
     pay_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
 class ProcessedCharge(Base):
@@ -134,4 +134,4 @@ class ProcessedCharge(Base):
     payment_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False, index=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
