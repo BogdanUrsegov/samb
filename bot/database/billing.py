@@ -48,6 +48,22 @@ async def attach_initial_payment(order_id: str, payment_id: str | None) -> None:
                 row.payment_id = payment_id
 
 
+async def mark_initial_payment_failed(order_id: str, payment_id: str | None, status: str) -> None:
+    """Release an expired/canceled order so a later user attempt gets a fresh order id."""
+    if status not in {"canceled", "expired"}:
+        return
+    async with async_session() as session:
+        async with session.begin():
+            row = await session.get(BillingPayment, order_id)
+            if not row or row.status == "paid":
+                return
+            if payment_id and row.payment_id and row.payment_id != payment_id:
+                return
+            if payment_id and not row.payment_id:
+                row.payment_id = payment_id
+            row.status = status
+
+
 async def get_initial_order(order_id: str) -> dict[str, Any] | None:
     async with async_session() as session:
         row = await session.get(BillingPayment, order_id)
