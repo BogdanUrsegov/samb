@@ -86,7 +86,7 @@ async def get_pending_initial_order(user_id: int) -> dict[str, Any] | None:
 
 async def complete_initial_payment(order_id: str, payment_id: str) -> bool:
     """Atomically mark the 17 RUB payment paid and grant the first 3 days once."""
-    now = datetime.utcnow()
+    now = datetime.now()
     async with sqlite_write_lock:
         async with async_session() as session:
             async with session.begin():
@@ -162,7 +162,7 @@ async def save_recurring_subscription(
             row.state = state
             row.billing_status = billing_status
             row.pay_url = pay_url
-            row.updated_at = datetime.utcnow()
+            row.updated_at = datetime.now()
 
 
 async def get_recurring_billing(user_id: int) -> dict[str, Any] | None:
@@ -198,12 +198,12 @@ async def update_recurring_state(user_id: int, state: str, billing_status: str) 
             if row:
                 row.state = state
                 row.billing_status = billing_status
-                row.updated_at = datetime.utcnow()
+                row.updated_at = datetime.now()
 
 
 async def apply_recurring_charge(payment_id: str, user_id: int, amount: float) -> bool:
     """Apply a confirmed recurring payment once, atomically with access extension."""
-    now = datetime.utcnow()
+    now = datetime.now()
     async with sqlite_write_lock:
         async with async_session() as session:
             async with session.begin():
