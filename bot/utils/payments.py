@@ -108,7 +108,7 @@ def create_recurring_subscription(
         return None
     if not RECURRING_PLAN_CONFIRMED:
         logger.error(
-            "Recurring plan is disabled until RollyPay confirms 299 RUB every 3 days; "
+            "Recurring plan is disabled until RollyPay confirms 299 RUB every 3 days and delays the first charge until the initial 3-day period ends; "
             "set ROLLYPAY_RECURRING_PLAN_CONFIRMED=true after verification"
         )
         return None
